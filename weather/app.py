@@ -106,7 +106,11 @@ st.markdown("""
 # ==========================================
 # 2. 설정 & 초기화
 # ==========================================
-API_KEY_ENCODED = "Gue9NhSEjOn3tSHlOYQHPkUdWqysG6DmPkl2YZ0aajiHUcpl5%2BdmgNN1G24%2B7phAqLkwB6SVsp9QtP%2B1NGc8cg%3D%3D"
+try:
+    API_KEY_ENCODED = st.secrets["api_key"]
+except FileNotFoundError:
+    st.error("secrets.toml 파일이 없거나 api_key가 설정되지 않았습니다.")
+    st.stop()
 EXCEL_FILENAME = "site_list.xlsx"
 CACHE_FILENAME = "site_list_cached.csv"
 LOGO_FILENAME = "gslogo.png"
@@ -542,4 +546,5 @@ if not df.empty:
 # ==========================================
 # 5. 하단 로고 (제거됨)
 # ==========================================
+
 st.divider()
