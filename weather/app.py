@@ -23,7 +23,7 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        /* 기본 여백 조정 */
+        /* 기본 컨테이너 패딩 조절 */
         .block-container {
             padding-top: 1rem;
             padding-bottom: 2rem;
@@ -32,82 +32,153 @@ st.markdown("""
         }
 
         /* ==========================================
-           [1] 타이틀 + 로고 박스 (PC/모바일 공통 수정)
+           [PC / 기본 스타일]
         ========================================== */
-        .custom-header-box {
-            display: flex; 
-            justify-content: center; /* 핵심: 양 끝이 아니라 '중앙' 정렬 */
-            align-items: center;     /* 수직 중앙 정렬 */
-            gap: 20px;               /* 글자와 로고 사이 간격 적당히 */
-            
-            background-color: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
 
-        .header-title {
-            font-size: 2.0rem; /* PC 폰트 크기 */
-            font-weight: 800;
-            color: #333;
-            margin: 0;
-            line-height: 1.2;
-            text-align: center; 
+        /* 메트릭 카드 디자인 */
+        .metric-card {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            height: 100px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
         }
         
-        .header-logo-img {
-            width: 80px; /* PC 로고 크기 */
-            height: auto;
-        }
-
-        /* 다크모드 대응 */
         @media (prefers-color-scheme: dark) {
-            .custom-header-box { background-color: #262730; border: 1px solid #464b5d; }
-            .header-title { color: #ffffff; }
+            .metric-card { background-color: #262730; border: 1px solid #464b5d; }
+            .metric-label { color: #fafafa !important; }
+            .metric-value { color: #ffffff !important; }
+            .scroll-box { background-color: #262730 !important; color: #fff !important; border: 1px solid #464b5d !important; }
+            .site-title { color: #4da6ff !important; }
+            .site-addr { color: #ccc !important; }
         }
-
-        /* ==========================================
-           [모바일 반응형: 화면 폭 600px 이하일 때]
-        ========================================== */
-        @media only screen and (max-width: 600px) {
-            .custom-header-box {
-                flex-direction: column; /* 세로로 쌓기 */
-                gap: 10px;
-                padding: 15px;
-            }
-            
-            .header-title {
-                font-size: 1.5rem; /* 모바일에서는 글자 작게 */
-                word-break: keep-all; /* 단어 안 잘리게 */
-            }
-            
-            .header-logo-img {
-                width: 60px; /* 모바일에서는 로고 작게 */
-            }
-        }
-
-        /* ==========================================
-           [나머지 기존 스타일 (건드리지 않음)]
-        ========================================== */
-        .metric-card { background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        @media (prefers-color-scheme: dark) { .metric-card { background-color: #262730; border: 1px solid #464b5d; } .metric-label { color: #fafafa !important; } .metric-value { color: #ffffff !important; } .scroll-box { background-color: #262730 !important; color: #fff !important; border: 1px solid #464b5d !important; } .site-title { color: #4da6ff !important; } .site-addr { color: #ccc !important; } }
+        
         .metric-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; font-weight: 600; }
         .metric-value { font-size: 2.0rem; font-weight: 800; color: #333; }
+        
+        /* 상세 정보 카드 스타일 */
         .site-title { font-size: 1.4rem; font-weight: 800; color: #1f77b4; margin: 0; line-height: 1.3; word-break: keep-all; }
         .site-addr { font-size: 0.95rem; color: #555; margin-bottom: 10px; }
-        .temp-badge { font-size: 1.1rem; font-weight: bold; color: #fff; background-color: #1f77b4; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
-        .site-header { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
-        .status-badge { font-size: 0.9rem; font-weight: bold; padding: 4px 8px; border-radius: 6px; color: white; display: inline-block; white-space: nowrap; flex-shrink: 0; }
+        .temp-badge { 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            color: #fff; 
+            background-color: #1f77b4;
+            padding: 6px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        
+        /* 현장명 + 배지 스타일 (PC 기본: 가로 배치) */
+        .site-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+            flex-wrap: wrap;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: white;
+            display: inline-block;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
         .badge-normal { background-color: #28a745; }
         .badge-warning { background-color: #dc3545; }
-        .scroll-box { height: 120px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; font-size: 0.9rem; line-height: 1.6; color: #333; white-space: pre-wrap; }
+
+        /* 특보 전문 박스 스타일 */
+        .scroll-box {
+            height: 120px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #333;
+            white-space: pre-wrap;
+        }
         
+        /* 상단 로고 스타일 */
+        .top-logo-container {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .top-logo-img {
+            width: 100px;
+            height: auto;
+        }
+        
+        /* Streamlit 기본 요소 스타일 조정 */
+        .st-emotion-cache-1y4p8pa { padding-top: 0px !important; }
+        h1 { font-size: 2.2rem !important; font-weight: 800 !important; }
+
+
+        /* ==========================================
+           [모바일 반응형 스타일 (최대폭 768px)]
+        ========================================== */
         @media only screen and (max-width: 768px) {
-            div[data-testid="column"] { width: 100% !important; flex: 1 1 auto !important; min-width: auto !important; }
-            .metric-card { margin-bottom: 10px; }
-            .site-header { flex-direction: column; align-items: flex-start; gap: 5px; }
+            /* 1. 상단 타이틀 및 로고 레이아웃 변경 */
+            
+            /* 메인 타이틀 크기 축소, 중앙 정렬, 줄바꿈 허용 */
+            h1 { 
+                font-size: 1.6rem !important; /* 폰트 크기 더 축소 */
+                text-align: center;
+                margin-bottom: 10px !important;
+                white-space: normal !important; /* 텍스트 줄바꿈 허용 */
+                word-break: keep-all; /* 단어 단위로 줄바꿈 */
+                line-height: 1.3; /* 줄 간격 조정 */
+            }
+
+            /* 상단 로고 컨테이너: 중앙 정렬 및 마진 조정 */
+            .top-logo-container {
+                justify-content: center;
+                margin-bottom: 15px;
+                margin-top: -5px; /* 타이틀과의 간격 조정 */
+            }
+            /* 상단 로고 이미지 크기 축소 */
+            .top-logo-img {
+                width: 80px;
+            }
+
+            /* 2. 메트릭 카드 세로 배치 */
+            div[data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 auto !important;
+                min-width: auto !important;
+            }
+            .metric-card {
+                margin-bottom: 10px;
+            }
+
+            /* 3. 현장 상세 정보 (타이틀 + 배지) 세로 배치 */
+            .site-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            .site-title {
+                font-size: 1.3rem;
+            }
+            .status-badge {
+                font-size: 0.85rem;
+                margin-top: 2px;
+            }
+            
+            /* 4. 기타 요소 최적화 */
             .metric-value { font-size: 1.8rem; }
             .temp-badge { font-size: 1.0rem; padding: 5px 10px; }
             .site-addr { font-size: 0.9rem; }
@@ -559,6 +630,7 @@ if not df.empty:
 # ==========================================
 
 st.divider()
+
 
 
 
