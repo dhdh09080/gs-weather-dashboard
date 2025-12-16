@@ -23,8 +23,18 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        .block-container { padding-top: 2rem; padding-bottom: 2rem; }
-        
+        /* 기본 컨테이너 패딩 조절 */
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 2rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        /* ==========================================
+           [PC / 기본 스타일]
+        ========================================== */
+
         /* 메트릭 카드 디자인 */
         .metric-card {
             background-color: #ffffff;
@@ -37,6 +47,7 @@ st.markdown("""
             justify-content: center;
             align-items: center;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s ease; /* 부드러운 전환 효과 추가 */
         }
         
         @media (prefers-color-scheme: dark) {
@@ -44,13 +55,15 @@ st.markdown("""
             .metric-label { color: #fafafa !important; }
             .metric-value { color: #ffffff !important; }
             .scroll-box { background-color: #262730 !important; color: #fff !important; border: 1px solid #464b5d !important; }
+            .site-title { color: #4da6ff !important; } /* 다크모드 타이틀 색상 밝게 */
+            .site-addr { color: #ccc !important; }
         }
         
         .metric-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; font-weight: 600; }
         .metric-value { font-size: 2.0rem; font-weight: 800; color: #333; }
         
         /* 상세 정보 카드 스타일 */
-        .site-title { font-size: 1.4rem; font-weight: 800; color: #1f77b4; margin: 0; }
+        .site-title { font-size: 1.4rem; font-weight: 800; color: #1f77b4; margin: 0; line-height: 1.3; word-break: keep-all; }
         .site-addr { font-size: 0.95rem; color: #555; margin-bottom: 10px; }
         .temp-badge { 
             font-size: 1.1rem; 
@@ -63,12 +76,13 @@ st.markdown("""
             margin-bottom: 10px;
         }
         
-        /* 현장명 + 배지 스타일 */
+        /* 현장명 + 배지 스타일 (PC 기본: 가로 배치) */
         .site-header {
             display: flex;
-            align-items: center;
+            align-items: center; /* 수직 중앙 정렬 */
             gap: 10px;
             margin-bottom: 5px;
+            flex-wrap: wrap; /* 공간 부족 시 줄바꿈 허용 */
         }
         .status-badge {
             font-size: 0.9rem;
@@ -77,6 +91,8 @@ st.markdown("""
             border-radius: 6px;
             color: white;
             display: inline-block;
+            white-space: nowrap; /* 배지 내용 줄바꿈 방지 */
+            flex-shrink: 0; /* 배지 크기 축소 방지 */
         }
         .badge-normal { background-color: #28a745; }
         .badge-warning { background-color: #dc3545; }
@@ -95,11 +111,78 @@ st.markdown("""
             white-space: pre-wrap;
         }
         
-        /* 로고 중앙 정렬 (하단 로고용) */
-        div[data-testid="stImage"] { display: flex; justify-content: center; }
-        div[data-testid="stImage"] > img { max-width: 100%; }
+        /* 상단 로고 스타일 */
+        .top-logo-container {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .top-logo-img {
+            width: 100px;
+            height: auto;
+        }
         
+        /* Streamlit 기본 요소 스타일 조정 */
         .st-emotion-cache-1y4p8pa { padding-top: 0px !important; }
+        h1 { font-size: 2.2rem !important; font-weight: 800 !important; } /* 타이틀 크기 조정 */
+
+
+        /* ==========================================
+           [모바일 반응형 스타일 (최대폭 768px)]
+        ========================================== */
+        @media only screen and (max-width: 768px) {
+            /* 1. 상단 타이틀 및 로고 레이아웃 변경 */
+            /* Streamlit 컬럼이 모바일에서는 수직으로 쌓이는 특성을 활용 */
+            
+            /* 메인 타이틀 크기 축소 및 중앙 정렬 */
+            h1 { 
+                font-size: 1.8rem !important; 
+                text-align: center;
+                margin-bottom: 10px !important;
+            }
+
+            /* 상단 로고 컨테이너: 중앙 정렬 및 마진 조정 */
+            .top-logo-container {
+                justify-content: center; /* 중앙 정렬 */
+                margin-bottom: 15px;
+                margin-top: -10px; /* 타이틀과의 간격 조정 */
+            }
+            /* 상단 로고 이미지 크기 축소 */
+            .top-logo-img {
+                width: 80px; /* 크기 줄임 */
+            }
+
+            /* 2. 메트릭 카드 세로 배치 */
+            /* Streamlit 컬럼 내의 div들이 모바일에서 100% 폭을 갖도록 강제 */
+            div[data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 auto !important;
+                min-width: auto !important;
+            }
+            /* 메트릭 카드 사이 간격 추가 */
+            .metric-card {
+                margin-bottom: 10px;
+            }
+
+            /* 3. 현장 상세 정보 (타이틀 + 배지) 세로 배치 */
+            .site-header {
+                flex-direction: column; /* 세로 방향 정렬 */
+                align-items: flex-start; /* 왼쪽 정렬 */
+                gap: 5px; /* 간격 조정 */
+            }
+            .site-title {
+                font-size: 1.3rem; /* 타이틀 크기 약간 축소 */
+            }
+            .status-badge {
+                font-size: 0.85rem; /* 배지 크기 약간 축소 */
+                margin-top: 2px;
+            }
+            
+            /* 4. 기타 요소 최적화 */
+            .metric-value { font-size: 1.8rem; } /* 메트릭 값 크기 축소 */
+            .temp-badge { font-size: 1.0rem; padding: 5px 10px; } /* 온도 배지 크기 축소 */
+            .site-addr { font-size: 0.9rem; } /* 주소 폰트 크기 축소 */
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -340,11 +423,11 @@ with col_logo:
         st.write("") 
         st.write("") 
         
-        # [핵심 수정] justify-content: flex-end (우측 끝 정렬) 적용
+        # [핵심 수정] CSS 클래스 적용 (반응형 스타일링을 위해)
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: flex-end; align-items: center;">
-                <img src="data:image/png;base64,{img_base64}" width="100">
+            <div class="top-logo-container">
+                <img src="data:image/png;base64,{img_base64}" class="top-logo-img">
             </div>
             """,
             unsafe_allow_html=True
@@ -548,3 +631,4 @@ if not df.empty:
 # ==========================================
 
 st.divider()
+
