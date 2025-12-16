@@ -23,7 +23,7 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-        /* 기본 컨테이너 여백 조정 */
+        /* 기본 여백 조정 */
         .block-container {
             padding-top: 1rem;
             padding-bottom: 2rem;
@@ -32,33 +32,34 @@ st.markdown("""
         }
 
         /* ==========================================
-           [1] 타이틀 + 로고 전용 박스 스타일
+           [1] 타이틀 + 로고 박스 (PC/모바일 공통 수정)
         ========================================== */
         .custom-header-box {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #f8f9fa; /* 연한 회색 배경 (박스 느낌) */
+            display: flex; 
+            justify-content: center; /* 핵심: 양 끝이 아니라 '중앙' 정렬 */
+            align-items: center;     /* 수직 중앙 정렬 */
+            gap: 20px;               /* 글자와 로고 사이 간격 적당히 */
+            
+            background-color: #f8f9fa;
             border: 1px solid #e0e0e0;
             border-radius: 15px;
-            padding: 15px 20px;
+            padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
         .header-title {
-            font-size: 1.8rem;
+            font-size: 2.0rem; /* PC 폰트 크기 */
             font-weight: 800;
             color: #333;
             margin: 0;
-            line-height: 1.3;
-            word-break: keep-all; /* 단어 단위 줄바꿈 */
+            line-height: 1.2;
+            text-align: center; 
         }
         
         .header-logo-img {
-            width: 80px;
+            width: 80px; /* PC 로고 크기 */
             height: auto;
-            margin-left: 15px;
         }
 
         /* 다크모드 대응 */
@@ -68,54 +69,32 @@ st.markdown("""
         }
 
         /* ==========================================
-           [모바일 반응형: 화면이 좁을 때]
+           [모바일 반응형: 화면 폭 600px 이하일 때]
         ========================================== */
         @media only screen and (max-width: 600px) {
             .custom-header-box {
                 flex-direction: column; /* 세로로 쌓기 */
-                text-align: center;     /* 가운데 정렬 */
+                gap: 10px;
                 padding: 15px;
             }
             
             .header-title {
-                font-size: 1.5rem; /* 폰트 줄임 */
-                margin-bottom: 10px; /* 로고와 간격 */
-                width: 100%; /* 박스 꽉 채우기 */
+                font-size: 1.5rem; /* 모바일에서는 글자 작게 */
+                word-break: keep-all; /* 단어 안 잘리게 */
             }
             
             .header-logo-img {
-                margin-left: 0;
-                width: 70px; /* 로고 조금 작게 */
+                width: 60px; /* 모바일에서는 로고 작게 */
             }
         }
 
         /* ==========================================
-           [기타 기존 스타일 유지]
+           [나머지 기존 스타일 (건드리지 않음)]
         ========================================== */
-        .metric-card {
-            background-color: #ffffff;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 15px;
-            height: 100px; 
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        @media (prefers-color-scheme: dark) {
-            .metric-card { background-color: #262730; border: 1px solid #464b5d; }
-            .metric-label { color: #fafafa !important; }
-            .metric-value { color: #ffffff !important; }
-            .scroll-box { background-color: #262730 !important; color: #fff !important; border: 1px solid #464b5d !important; }
-            .site-title { color: #4da6ff !important; }
-            .site-addr { color: #ccc !important; }
-        }
+        .metric-card { background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        @media (prefers-color-scheme: dark) { .metric-card { background-color: #262730; border: 1px solid #464b5d; } .metric-label { color: #fafafa !important; } .metric-value { color: #ffffff !important; } .scroll-box { background-color: #262730 !important; color: #fff !important; border: 1px solid #464b5d !important; } .site-title { color: #4da6ff !important; } .site-addr { color: #ccc !important; } }
         .metric-label { font-size: 0.9rem; color: #666; margin-bottom: 5px; font-weight: 600; }
         .metric-value { font-size: 2.0rem; font-weight: 800; color: #333; }
-        
-        /* 상세 정보 카드 */
         .site-title { font-size: 1.4rem; font-weight: 800; color: #1f77b4; margin: 0; line-height: 1.3; word-break: keep-all; }
         .site-addr { font-size: 0.95rem; color: #555; margin-bottom: 10px; }
         .temp-badge { font-size: 1.1rem; font-weight: bold; color: #fff; background-color: #1f77b4; padding: 6px 12px; border-radius: 20px; display: inline-block; margin-bottom: 10px; }
@@ -123,11 +102,8 @@ st.markdown("""
         .status-badge { font-size: 0.9rem; font-weight: bold; padding: 4px 8px; border-radius: 6px; color: white; display: inline-block; white-space: nowrap; flex-shrink: 0; }
         .badge-normal { background-color: #28a745; }
         .badge-warning { background-color: #dc3545; }
-        
-        /* 특보 전문 박스 */
         .scroll-box { height: 120px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; font-size: 0.9rem; line-height: 1.6; color: #333; white-space: pre-wrap; }
         
-        /* 모바일에서 메트릭 카드 세로 배치 */
         @media only screen and (max-width: 768px) {
             div[data-testid="column"] { width: 100% !important; flex: 1 1 auto !important; min-width: auto !important; }
             .metric-card { margin-bottom: 10px; }
@@ -583,6 +559,7 @@ if not df.empty:
 # ==========================================
 
 st.divider()
+
 
 
 
