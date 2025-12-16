@@ -34,11 +34,11 @@ st.markdown("""
         }
 
         /* ==========================================
-           [1] 타이틀 + 로고 박스 (PC/모바일 공통)
+           [1] 타이틀 + 로고 박스 (중앙 정렬 유지)
         ========================================== */
         .custom-header-box {
             display: flex; 
-            justify-content: center; 
+            justify-content: center; /* 중앙 정렬 (수정 금지) */
             align-items: center;     
             gap: 20px;               
             
@@ -183,7 +183,7 @@ def create_warning_poster(warning_summary, total_sites, normal_sites_count):
     
     # 타이틀
     title_text = "GS건설 현장 기상특보 현황"
-    # textbbox를 사용하여 텍스트 크기 계산 (left, top, right, bottom)
+    # textbbox를 사용하여 텍스트 크기 계산
     bbox = draw.textbbox((0, 0), title_text, font=title_font)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
@@ -202,18 +202,20 @@ def create_warning_poster(warning_summary, total_sites, normal_sites_count):
     y_position = 320
     
     if not warning_summary:
-        draw.text((W/2 - 100, y_position + 50), "현재 발령된 특보가 없습니다.", font=subtitle_font, fill="#28a745")
+        # 특보가 없을 때 가운데에 메시지 표시
+        msg = "✅ 현재 발령된 기상 특보가 없습니다."
+        bbox = draw.textbbox((0, 0), msg, font=subtitle_font)
+        msg_w = bbox[2] - bbox[0]
+        draw.text(((W - msg_w) / 2, y_position + 100), msg, font=subtitle_font, fill="#28a745")
     else:
         for w_name, sites in warning_summary.items():
             # 특보 제목 (예: 한파주의보)
-            color = "red" if "경보" in w_name else "#ff6600" # 경보는 빨강, 주의보는 주황
+            color = "red" if "경보" in w_name else "#ff6600"
             draw.text((50, y_position), f"⚠️ {w_name} ({len(sites)}개소)", font=content_title_font, fill=color)
             y_position += 45
             
             # 현장 목록 (줄바꿈 처리)
             sites_str = ", ".join(sites)
-            
-            # 간단한 텍스트 줄바꿈 로직
             margin = 50
             max_width = W - (margin * 2)
             words = sites_str.split(' ')
@@ -232,7 +234,6 @@ def create_warning_poster(warning_summary, total_sites, normal_sites_count):
             draw.text((margin, y_position), line, font=content_font, fill="#333333")
             y_position += 60 # 다음 특보 사이 간격
 
-            # 페이지 넘침 방지 (너무 길면 자름)
             if y_position > H - 100:
                 draw.text((margin, y_position), "... (이하 생략)", font=content_font, fill="#999999")
                 break
@@ -593,21 +594,21 @@ if not df.empty:
         list_height_px = 280 if is_site_selected else 430
         
         with st.container(height=list_height_px, border=True):
-            if warning_summary:
-                # [추가] 포스터 다운로드 버튼
-                poster_img_bytes = create_warning_poster(warning_summary, len(df), len(normal_sites_list))
-                today_str = datetime.datetime.now().strftime("%Y%m%d")
-                
-                st.download_button(
-                    label="🖼️ 특보 현황 포스터 다운로드",
-                    data=poster_img_bytes,
-                    file_name=f"기상특보현황_{today_str}.jpg",
-                    mime="image/jpeg",
-                    use_container_width=True
-                )
-                
-                st.divider() # 구분선
+            # [수정] 버튼을 if문 밖으로 꺼내서 항상 보이게 함
+            poster_img_bytes = create_warning_poster(warning_summary, len(df), len(normal_sites_list))
+            today_str = datetime.datetime.now().strftime("%Y%m%d")
+            
+            st.download_button(
+                label="🖼️ 특보 현황 포스터 다운로드",
+                data=poster_img_bytes,
+                file_name=f"기상특보현황_{today_str}.jpg",
+                mime="image/jpeg",
+                use_container_width=True
+            )
+            
+            st.divider() # 구분선
 
+            if warning_summary:
                 for w_name, sites in warning_summary.items():
                     with st.container(border=True):
                         if "경보" in w_name:
