@@ -191,7 +191,7 @@ def create_warning_poster(warning_summary, total_sites, normal_sites_count):
 
     # 4. 날짜 및 개요
     current_time = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M 기준')
-    summary_text = f"총 현장: {total_sites}개소  |  ✅ 이상 없음: {normal_sites_count}개소  |  🚨 특보 발령: {total_sites - normal_sites_count}개소"
+    summary_text = f"총 현장: {total_sites}  |  이상 없음: {normal_sites_count}  |  특보 발령: {total_sites - normal_sites_count}"
     
     draw.text((50, 180), current_time, font=subtitle_font, fill="#555555")
     draw.text((50, 230), summary_text, font=content_title_font, fill="#333333")
@@ -203,7 +203,7 @@ def create_warning_poster(warning_summary, total_sites, normal_sites_count):
     
     if not warning_summary:
         # 특보가 없을 때 가운데에 메시지 표시
-        msg = "✅ 현재 발령된 기상 특보가 없습니다."
+        msg = "현재 발령된 기상 특보가 없습니다."
         bbox = draw.textbbox((0, 0), msg, font=subtitle_font)
         msg_w = bbox[2] - bbox[0]
         draw.text(((W - msg_w) / 2, y_position + 100), msg, font=subtitle_font, fill="#28a745")
@@ -240,7 +240,7 @@ def create_warning_poster(warning_summary, total_sites, normal_sites_count):
 
     # 6. 하단 푸터
     draw.line([(50, H-80), (W-50, H-80)], fill="#dddddd", width=2)
-    footer_text = "GS E&C Smart Safety System"
+    footer_text = "GS E&C 안전보건팀"
     bbox = draw.textbbox((0, 0), footer_text, font=footer_font)
     f_w = bbox[2] - bbox[0]
     draw.text(((W - f_w) / 2, H - 50), footer_text, font=footer_font, fill="#999999")
@@ -666,4 +666,5 @@ if not df.empty:
             st.error("지도에 표시할 수 있는 현장이 없습니다.")
 
 st.divider()
+
 
