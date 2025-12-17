@@ -451,7 +451,7 @@ if os.path.exists(logo_path):
 st.markdown(
     f"""
     <div class="custom-header-box">
-        <div class="header-title">GS건설 현장<br>기상정보 상황실</div>
+        <div class="header-title">GS건설 현장 기상정보</div>
         <img src="data:image/png;base64,{img_base64}" class="header-logo-img">
     </div>
     """,
@@ -666,3 +666,4 @@ if not df.empty:
             st.error("지도에 표시할 수 있는 현장이 없습니다.")
 
 st.divider()
+
