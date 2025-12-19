@@ -26,9 +26,9 @@ st.set_page_config(
 # CSS 스타일 최적화 (여백 축소 및 시인성 강화)
 st.markdown("""
     <style>
-        /* 상단 여백 최소화 */
+        /* [수정 1] 상단 여백(padding-top)을 1rem -> 3rem으로 늘려 제목 위 공간 확보 */
         .block-container {
-            padding-top: 1rem;
+            padding-top: 3rem; 
             padding-bottom: 1rem;
             padding-left: 1rem;
             padding-right: 1rem;
@@ -43,14 +43,18 @@ st.markdown("""
             background-color: #f8f9fa;
             border: 1px solid #e0e0e0;
             border-radius: 12px;
-            padding: 15px;
+            
+            /* [수정 2] 박스 내부 여백도 조금 더 넉넉하게 조정 */
+            padding: 20px; 
+            
             margin-bottom: 10px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            flex-wrap: wrap; /* 화면 작을 때 줄바꿈 허용 */
+            flex-wrap: wrap; 
         }
 
         .header-title {
-            font-size: 1.8rem; 
+            /* [수정 3] 폰트 크기를 1.8rem -> 1.6rem으로 축소하여 잘림 방지 */
+            font-size: 1.6rem; 
             font-weight: 800;
             color: #005bac; /* GS Blue */
             margin: 0;
@@ -60,7 +64,7 @@ st.markdown("""
         }
         
         .header-logo-img {
-            height: 50px; /* 로고 크기 최적화 */
+            height: 45px; /* 로고 크기도 텍스트에 맞춰 살짝 조정 */
             width: auto;
         }
 
@@ -72,10 +76,10 @@ st.markdown("""
 
         /* 모바일 대응 */
         @media only screen and (max-width: 600px) {
-            .header-title { font-size: 1.4rem; white-space: normal; word-break: keep-all; }
+            .header-title { font-size: 1.3rem; white-space: normal; word-break: keep-all; }
         }
 
-        /* 메트릭 카드 (높이 축소) */
+        /* 메트릭 카드 */
         .metric-card { 
             background-color: #ffffff; 
             border: 1px solid #e0e0e0; 
@@ -91,7 +95,6 @@ st.markdown("""
         .metric-label { font-size: 0.85rem; color: #666; font-weight: 600; margin-bottom: 2px; }
         .metric-value { font-size: 1.6rem; font-weight: 800; color: #333; }
         
-        /* 다크모드 메트릭 */
         @media (prefers-color-scheme: dark) { 
             .metric-card { background-color: #262730; border: 1px solid #464b5d; } 
             .metric-label { color: #fafafa !important; } 
@@ -599,5 +602,6 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
 
 
