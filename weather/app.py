@@ -263,32 +263,43 @@ def dfs_xy_conv(v1, v2):
 
 # [최적화] 기온 데이터 캐싱 (TTL 10분) - API 호출 최소화
 @st.cache_data(ttl=600)
+# [수정] 캐시 데코레이터(@st.cache_data)를 제거하여 클릭 시 무조건 실시간 호출하도록 변경
 def get_current_temp_optimized(lat, lon):
     try:
         nx, ny = dfs_xy_conv(lat, lon)
-        now = datetime.datetime.now()
-        # 기상청 초단기실황은 매시 40분 이후에 해당 시간 데이터 생성
-        if now.minute <= 40: 
-            now = now - datetime.timedelta(hours=1)
         
-        base_date = now.strftime('%Y%m%d')
-        base_time = now.strftime('%H00') # 정시 기준
+        # 현재 시간
+        now = datetime.datetime.now()
+        
+        # 기상청 초단기실황(NCST) 생성 기준: 매시 40분
+        # 예: 10시 39분 -> 9시 데이터 사용 / 10시 41분 -> 10시 데이터 사용
+        if now.minute <= 40: 
+            target_time = now - datetime.timedelta(hours=1)
+        else:
+            target_time = now
+            
+        base_date = target_time.strftime('%Y%m%d')
+        base_time = target_time.strftime('%H00') # 정시 기준
         
         base_url = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
         query_params = f"?serviceKey={API_KEY_ENCODED}&pageNo=1&numOfRows=10&dataType=JSON&base_date={base_date}&base_time={base_time}&nx={nx}&ny={ny}"
         
+        # 타임아웃을 3초로 설정하여 너무 오래 걸리면 패스
         response = requests.get(base_url + query_params, timeout=3)
+        
         data = response.json()
         
         if data['response']['header']['resultCode'] == '00':
             items = data['response']['body']['items']['item']
             for item in items:
-                if item['category'] == 'T1H': 
-                    # 기온과 기준 시간을 함께 반환
-                    obsr_time = f"{base_date[4:6]}월 {base_date[6:8]}일 {base_time[:2]}:00"
-                    return float(item['obsrValue']), obsr_time
+                if item['category'] == 'T1H': # 기온
+                    # 날짜/시간 포맷팅 (예: 12월 19일 03:00)
+                    formatted_time = f"{base_date[4:6]}월 {base_date[6:8]}일 {base_time[:2]}:00"
+                    return float(item['obsrValue']), formatted_time
+                    
         return None, None
-    except Exception:
+    except Exception as e:
+        # 에러 발생 시 로그 출력 (디버깅용) 혹은 None 반환
         return None, None
 
 def get_coordinates(address):
@@ -590,3 +601,4 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
