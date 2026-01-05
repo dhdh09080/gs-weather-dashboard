@@ -3,8 +3,8 @@ import pandas as pd
 import requests
 import datetime
 import re
-# folium
-# from streamlit_folium import st_folium
+import folium
+from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 import time
 import math
@@ -652,3 +652,4 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
