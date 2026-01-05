@@ -187,8 +187,10 @@ def create_warning_poster(full_df, warning_summary):
     text_w = bbox[2] - bbox[0]
     draw.text(((W - text_w) / 2, 140), title_text, font=font_title, fill="white")
 
+    # [수정됨] 한국 시간 적용 (pytz)
     kst = pytz.timezone('Asia/Seoul')
-    current_time = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M 기준')
+    current_time = datetime.datetime.now(kst).strftime('%Y년 %m월 %d일 %H:%M 기준')
+    
     bbox = draw.textbbox((0, 0), current_time, font=font_subtitle)
     text_w = bbox[2] - bbox[0]
     draw.text(((W - text_w) / 2, 320), current_time, font=font_subtitle, fill="#dddddd")
@@ -329,11 +331,11 @@ def dfs_xy_conv(v1, v2):
 def get_current_temp_optimized(lat, lon):
     try:
         nx, ny = dfs_xy_conv(lat, lon)
-        # 한국 시간대 정의
-        kst = pytz.timezone('Asia/Seoul')
         
-        # 한국 시간 기준으로 현재 시간 가져오기
-        now = datetime.now(kst)
+        # [수정됨] 한국 시간 적용 (pytz)
+        kst = pytz.timezone('Asia/Seoul')
+        now = datetime.datetime.now(kst)
+        
         if now.minute <= 40: 
             target_time = now - datetime.timedelta(hours=1)
         else:
@@ -602,9 +604,13 @@ if not df.empty:
             try:
                 poster_img_bytes = create_warning_poster(df, warning_summary)
                 
+                # [수정됨] 다운로드 파일 이름에도 한국 시간 적용
+                kst = pytz.timezone('Asia/Seoul')
+                now_kst = datetime.datetime.now(kst)
+                
                 st.download_button(
                     "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
-                    file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
+                    file_name=f"기상특보_현황_{now_kst.strftime('%Y%m%d')}.jpg",
                     mime="image/jpeg", use_container_width=True
                 )
             except Exception as e:
@@ -657,7 +663,3 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
-
-
-
-
