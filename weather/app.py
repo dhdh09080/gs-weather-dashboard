@@ -4,6 +4,7 @@ import requests
 import datetime
 import re
 import folium
+import pytz
 from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 import time
@@ -328,7 +329,11 @@ def get_current_temp_optimized(lat, lon):
     try:
         nx, ny = dfs_xy_conv(lat, lon)
         kst = datetime.timezone(datetime.timedelta(hours=9))
-        now = datetime.datetime.now(kst)
+        # 한국 시간대 정의
+        kst = pytz.timezone('Asia/Seoul')
+        
+        # 한국 시간 기준으로 현재 시간 가져오기
+        now = datetime.now(kst)
         if now.minute <= 40: 
             target_time = now - datetime.timedelta(hours=1)
         else:
@@ -652,4 +657,5 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
 
