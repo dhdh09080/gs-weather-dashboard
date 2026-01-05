@@ -700,7 +700,7 @@ if not df.empty:
 
     with col_right:
         valid_coords = df.dropna(subset=['lat', 'lon'])
-        st.markdown("<div class='map-disclaimer'>⚠️ 본 지도는 OpenStreetMap(무료) 기반으로 실제 위치와 약간의 오차가 있을 수 있습니다.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='map-disclaimer'>⚠️ 본 지도는 OpenStreetMap(무료) 기반으로 실제 위치와 약간의 오차가 있을 수 있습니다!.</div>", unsafe_allow_html=True)
 
         if not valid_coords.empty:
             if st.session_state.selected_site:
