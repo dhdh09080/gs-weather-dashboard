@@ -328,7 +328,6 @@ def dfs_xy_conv(v1, v2):
 def get_current_temp_optimized(lat, lon):
     try:
         nx, ny = dfs_xy_conv(lat, lon)
-        kst = datetime.timezone(datetime.timedelta(hours=9))
         # 한국 시간대 정의
         kst = pytz.timezone('Asia/Seoul')
         
@@ -657,5 +656,6 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
 
 
