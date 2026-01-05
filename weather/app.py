@@ -3,8 +3,8 @@ import pandas as pd
 import requests
 import datetime
 import re
-import folium
-from streamlit_folium import st_folium
+# folium
+# from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 import time
 import math
@@ -52,6 +52,12 @@ st.markdown("""
         .badge-normal { background-color: #28a745; }
         .badge-warning { background-color: #dc3545; }
         .map-disclaimer { font-size: 0.75rem; color: #666; background-color: rgba(255, 255, 255, 0.7); padding: 2px 5px; border-radius: 4px; margin-bottom: 2px; text-align: right; }
+        
+        /* 버튼 스타일 */
+        .stButton>button {
+            border-radius: 8px;
+            font-weight: bold;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -73,7 +79,7 @@ if 'weather_data' not in st.session_state:
 if 'selected_site' not in st.session_state:
     st.session_state.selected_site = None
 
-geolocator = Nominatim(user_agent="korea_weather_guard_gs_final_layout", timeout=15)
+geolocator = Nominatim(user_agent="korea_weather_guard_gs_final_update", timeout=15)
 
 # ==========================================
 # 3. 함수 정의
@@ -108,7 +114,7 @@ def load_custom_font(size=20):
     return ImageFont.load_default()
 
 # -----------------------------------------------------------
-# [🔥 핵심 수정] 포스터 생성 함수 (지도 제거, 박스형 레이아웃, A4 꽉 채우기)
+# [포스터 생성 함수]
 # -----------------------------------------------------------
 def create_warning_poster(full_df, warning_summary):
     # A4 Size (300dpi)
@@ -149,11 +155,8 @@ def create_warning_poster(full_df, warning_summary):
     total_count = len(sites_heat_warning) + len(sites_heat_advisory) + len(sites_cold_15) + len(sites_cold_12)
     for _, s in sites_others: total_count += len(s)
 
-    # 기본값 (크게)
     base_size = 55
     line_sp = 80
-    
-    # 현장이 많으면 축소
     if total_count > 100: base_size = 30; line_sp = 45
     elif total_count > 60: base_size = 35; line_sp = 55
     elif total_count > 30: base_size = 45; line_sp = 65
@@ -196,7 +199,6 @@ def create_warning_poster(full_df, warning_summary):
     def draw_warning_box(title, title_color, bg_color, border_color, sites, start_y):
         if not sites: return start_y
         
-        # 텍스트 줄바꿈 계산
         sites_str = ", ".join(sites)
         max_w = content_width - (box_padding * 2)
         lines = []
@@ -211,12 +213,10 @@ def create_warning_poster(full_df, warning_summary):
                 curr_line = test_line
         if curr_line: lines.append(curr_line)
         
-        # 박스 그리기
         box_h = box_padding * 2 + 80 + (len(lines) * line_sp) + 20
         draw.rounded_rectangle([(margin_x, start_y), (W - margin_x, start_y + box_h)], 
                                radius=box_radius, fill=bg_color, outline=border_color, width=5)
         
-        # 텍스트 쓰기
         tx, ty = margin_x + box_padding, start_y + box_padding
         draw.text((tx, ty), title, font=font_box_title, fill=title_color)
         ty += 100
@@ -224,9 +224,8 @@ def create_warning_poster(full_df, warning_summary):
             draw.text((tx, ty), line, font=font_content, fill="#333333")
             ty += line_sp
             
-        return start_y + box_h + 60 # 다음 박스 위치
+        return start_y + box_h + 60 
 
-    # 박스 순서대로 그리기
     is_empty = True
     if sites_heat_warning:
         current_y = draw_warning_box(f"🔥 폭염 경보 ({len(sites_heat_warning)}개소)", "#d32f2f", "#ffebee", "#ffcdd2", sites_heat_warning, current_y)
@@ -252,12 +251,11 @@ def create_warning_poster(full_df, warning_summary):
         draw.text((margin_x + 60, current_y + 110), "현재 건설안전 관련 기상 특보가 없습니다.", font=font_box_title, fill="#33691e")
         current_y += 300
 
-    # 3. 하단 안전수칙 (박스형, 하단 고정)
-    bottom_start_y = H - 1400 # 하단 공간 확보
+    # 3. 하단 안전수칙
+    bottom_start_y = H - 1400 
     if current_y < bottom_start_y: current_y = bottom_start_y
 
     def draw_safety_box(title, content, color_set, start_y):
-        # color_set: (title_color, bg_color, border_color)
         t_col, bg_col, bd_col = color_set
         box_h = 600
         draw.rounded_rectangle([(margin_x, start_y), (W - margin_x, start_y + box_h)], 
@@ -411,7 +409,6 @@ def get_weather_status():
         return items[0].get('t6', '')
     except: return None
 
-# [건조 제외]
 def analyze_all_warnings(full_text, keywords):
     if not full_text: return []
     clean_text = full_text.replace('\r', ' ').replace('\n', ' ')
@@ -489,6 +486,17 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# [🔥 추가됨] 데이터 최신화 버튼 (헤더 아래)
+col_btn, _ = st.columns([2, 8])
+with col_btn:
+    if st.button("🔄 실시간 데이터 업데이트", use_container_width=True):
+        # 1. API 데이터 캐시 클리어 (온도 등)
+        st.cache_data.clear()
+        # 2. 세션 스테이트 초기화 (특보 데이터 다시 불러오기 위함)
+        st.session_state.weather_data = None
+        # 3. 앱 리런
+        st.rerun()
+
 if st.session_state.weather_data is None:
     st.session_state.weather_data = load_data_once()
 
@@ -530,7 +538,6 @@ if not df.empty:
 
     st.divider()
 
-    # [수정됨] 메인 UI는 다시 2분할 (지도 포함)
     col_left, col_right = st.columns([3.5, 6.5])
 
     with col_left:
