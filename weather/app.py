@@ -73,7 +73,7 @@ if 'weather_data' not in st.session_state:
 if 'selected_site' not in st.session_state:
     st.session_state.selected_site = None
 
-geolocator = Nominatim(user_agent="korea_weather_guard_gs_final_fix", timeout=15)
+geolocator = Nominatim(user_agent="korea_weather_guard_gs_final_fix_v2", timeout=15)
 
 # ==========================================
 # 3. 지도 이미지 생성을 위한 유틸리티
@@ -224,7 +224,7 @@ def create_warning_poster(full_df, warning_summary):
     has_cold = False
 
     for w_name, sites in warning_summary.items():
-        # [확인사살] 포스터 생성 시에도 건조는 제외
+        # [API 가이드 기준] 건조 특보(4번 코드 해당)는 텍스트 파싱 시 제외
         if "건조" in w_name: continue
 
         # 지도 데이터 수집 (건조 뺀 모든 특보)
@@ -304,6 +304,7 @@ def create_warning_poster(full_df, warning_summary):
             if "태풍" in w_name: color = "#8B0000"
             elif "호우" in w_name: color = "#4B0082"
             elif "대설" in w_name: color = "#008B8B"
+            elif "강풍" in w_name: color = "#006400"
             list_y = draw_site_group(f"⚠️ {w_name} ({len(s_list)}개소)", color, s_list, list_y)
             
         if list_y > (body_y + 1150):
@@ -459,7 +460,7 @@ def get_weather_status():
         return items[0].get('t6', '')
     except: return None
 
-# [🔥 핵심 수정: 건조는 무조건 제외 / 안전 관련 특보는 모두 허용]
+# [🔥 핵심 수정: API 가이드 기준(t6)으로 '건조' 단어 포함시 무조건 제외]
 def analyze_all_warnings(full_text, keywords):
     if not full_text: return []
     clean_text = full_text.replace('\r', ' ').replace('\n', ' ')
@@ -470,7 +471,7 @@ def analyze_all_warnings(full_text, keywords):
         w_name = match.group(1).strip()
         content = match.group(2)
         
-        # 1. "건조"가 포함되어 있으면 무조건 건너뜀 (절대 금지)
+        # 1. API 가이드에 따라 '건조'가 텍스트에 있으면 무조건 제외
         if "건조" in w_name:
             continue
             
