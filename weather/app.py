@@ -23,105 +23,36 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS 스타일 최적화 (여백 축소 및 시인성 강화)
 st.markdown("""
     <style>
-        /* [수정 1] 상단 여백(padding-top)을 1rem -> 3rem으로 늘려 제목 위 공간 확보 */
-        .block-container {
-            padding-top: 3rem; 
-            padding-bottom: 1rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-
-        /* 헤더 박스 스타일 */
+        .block-container { padding-top: 3rem; padding-bottom: 1rem; padding-left: 1rem; padding-right: 1rem; }
         .custom-header-box {
-            display: flex; 
-            justify-content: center; 
-            align-items: center;     
-            gap: 15px;               
-            background-color: #f8f9fa;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            
-            /* [수정 2] 박스 내부 여백도 조금 더 넉넉하게 조정 */
-            padding: 20px; 
-            
-            margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            flex-wrap: wrap; 
+            display: flex; justify-content: center; align-items: center; gap: 15px;
+            background-color: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px;
+            padding: 20px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: wrap;
         }
-
-        .header-title {
-            /* [수정 3] 폰트 크기를 1.8rem -> 1.6rem으로 축소하여 잘림 방지 */
-            font-size: 1.6rem; 
-            font-weight: 800;
-            color: #005bac; /* GS Blue */
-            margin: 0;
-            line-height: 1.2;
-            text-align: center; 
-            white-space: nowrap;
-        }
-        
-        .header-logo-img {
-            height: 45px; /* 로고 크기도 텍스트에 맞춰 살짝 조정 */
-            width: auto;
-        }
-
-        /* 다크모드 대응 */
+        .header-title { font-size: 1.6rem; font-weight: 800; color: #005bac; margin: 0; line-height: 1.2; text-align: center; white-space: nowrap; }
+        .header-logo-img { height: 45px; width: auto; }
         @media (prefers-color-scheme: dark) {
             .custom-header-box { background-color: #262730; border: 1px solid #464b5d; }
             .header-title { color: #ffffff; }
         }
-
-        /* 모바일 대응 */
-        @media only screen and (max-width: 600px) {
-            .header-title { font-size: 1.3rem; white-space: normal; word-break: keep-all; }
-        }
-
-        /* 메트릭 카드 */
         .metric-card { 
-            background-color: #ffffff; 
-            border: 1px solid #e0e0e0; 
-            border-radius: 8px; 
-            padding: 10px; 
-            height: 80px; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+            background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
+            padding: 10px; height: 80px; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
         }
         .metric-label { font-size: 0.85rem; color: #666; font-weight: 600; margin-bottom: 2px; }
         .metric-value { font-size: 1.6rem; font-weight: 800; color: #333; }
-        
-        @media (prefers-color-scheme: dark) { 
-            .metric-card { background-color: #262730; border: 1px solid #464b5d; } 
-            .metric-label { color: #fafafa !important; } 
-            .metric-value { color: #ffffff !important; }
-        }
-
-        /* 현장 상세 정보 스타일 */
         .site-title { font-size: 1.3rem; font-weight: 800; color: #1f77b4; margin: 0; line-height: 1.2; word-break: keep-all; }
         .site-addr { font-size: 0.9rem; color: #555; margin-bottom: 8px; }
         .temp-badge { font-size: 1.2rem; font-weight: bold; color: #fff; background-color: #1f77b4; padding: 5px 12px; border-radius: 15px; display: inline-block; margin-right: 5px; }
         .time-caption { font-size: 0.8rem; color: #888; margin-top: 5px; }
         .site-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
-        
         .status-badge { font-size: 0.8rem; font-weight: bold; padding: 3px 8px; border-radius: 4px; color: white; display: inline-block; white-space: nowrap; }
         .badge-normal { background-color: #28a745; }
         .badge-warning { background-color: #dc3545; }
-        
-        /* 지도 면책 조항 */
-        .map-disclaimer {
-            font-size: 0.75rem;
-            color: #666;
-            background-color: rgba(255, 255, 255, 0.7);
-            padding: 2px 5px;
-            border-radius: 4px;
-            margin-bottom: 2px;
-            text-align: right;
-        }
+        .map-disclaimer { font-size: 0.75rem; color: #666; background-color: rgba(255, 255, 255, 0.7); padding: 2px 5px; border-radius: 4px; margin-bottom: 2px; text-align: right; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -146,7 +77,108 @@ if 'selected_site' not in st.session_state:
 geolocator = Nominatim(user_agent="korea_weather_guard_gs", timeout=15)
 
 # ==========================================
-# 3. 함수 정의
+# 3. 지도 이미지 생성을 위한 유틸리티 (Static Map)
+# ==========================================
+def deg2num(lat_deg, lon_deg, zoom):
+    lat_rad = math.radians(lat_deg)
+    n = 2.0 ** zoom
+    xtile = int((lon_deg + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n)
+    return (xtile, ytile)
+
+def num2deg(xtile, ytile, zoom):
+    n = 2.0 ** zoom
+    lon_deg = xtile / n * 360.0 - 180.0
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / n)))
+    lat_deg = math.degrees(lat_rad)
+    return (lat_deg, lon_deg)
+
+def generate_static_map_image(df_target, width=1200, height=1200):
+    # 타겟 현장이 없으면 기본 지도 반환
+    if df_target.empty:
+        img = Image.new('RGB', (width, height), (240, 240, 240))
+        return img
+
+    # 1. 줌 레벨 및 중심 좌표 계산
+    min_lat, max_lat = df_target['lat'].min(), df_target['lat'].max()
+    min_lon, max_lon = df_target['lon'].min(), df_target['lon'].max()
+    
+    # 여백 추가
+    lat_margin = (max_lat - min_lat) * 0.1 if max_lat != min_lat else 0.5
+    lon_margin = (max_lon - min_lon) * 0.1 if max_lon != min_lon else 0.5
+    
+    min_lat -= lat_margin
+    max_lat += lat_margin
+    min_lon -= lon_margin
+    max_lon += lon_margin
+    
+    # 줌 레벨 결정 (간단한 휴리스틱)
+    zoom = 7
+    if (max_lat - min_lat) < 3 and (max_lon - min_lon) < 3: zoom = 8
+    if (max_lat - min_lat) < 1.5 and (max_lon - min_lon) < 1.5: zoom = 9
+    
+    # 타일 범위 계산
+    x_min, y_max = deg2num(min_lat, min_lon, zoom) # y는 위쪽이 0이므로 max lat이 min y
+    x_max, y_min = deg2num(max_lat, max_lon, zoom)
+    
+    # 타일 스티칭
+    tile_size = 256
+    x_count = x_max - x_min + 1
+    y_count = y_max - y_min + 1
+    
+    full_width = x_count * tile_size
+    full_height = y_count * tile_size
+    map_img = Image.new('RGB', (full_width, full_height), (255, 255, 255))
+    
+    # 타일 다운로드 및 붙이기
+    user_agent = "Mozilla/5.0 (WeatherPoster/1.0)"
+    headers = {"User-Agent": user_agent}
+    
+    for x in range(x_min, x_max + 1):
+        for y in range(y_min, y_max + 1):
+            url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
+            try:
+                resp = requests.get(url, headers=headers, timeout=1)
+                if resp.status_code == 200:
+                    tile = Image.open(io.BytesIO(resp.content))
+                    map_img.paste(tile, ((x - x_min) * tile_size, (y - y_min) * tile_size))
+            except:
+                pass
+
+    # 2. 결과 이미지 크롭 (중심 기준 width x height)
+    # 픽셀 좌표 변환 함수
+    def get_pixel_coords(lat, lon):
+        n = 2.0 ** zoom
+        x = (lon + 180.0) / 360.0 * n
+        y = (1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n
+        px = (x - x_min) * tile_size
+        py = (y - y_min) * tile_size
+        return px, py
+
+    # 3. 마커 그리기
+    draw = ImageDraw.Draw(map_img)
+    # 아이콘/점 그리기
+    for idx, row in df_target.iterrows():
+        px, py = get_pixel_coords(row['lat'], row['lon'])
+        warnings = row['warnings']
+        
+        color = "gray"
+        radius = 8
+        if warnings:
+            if any("폭염" in w for w in warnings): color = "red"
+            elif any("한파" in w for w in warnings): color = "blue"
+            else: continue # 한파/폭염 아니면 지도에 표시 안함 (요청사항 8-1)
+            
+            # 마커 (원)
+            draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=color, outline="white", width=2)
+
+    # 4. 리사이즈 (Mapbox 등의 로고를 피하기 위해 약간 크롭 후 리사이즈 권장되나 여기선 단순 리사이즈)
+    # 원하는 뷰포트로 자르기 (중앙 기준)
+    # 여기서는 전체 맵을 반환하고 포스터 함수에서 배치
+    return map_img.resize((width, height), Image.LANCZOS)
+
+# ==========================================
+# 4. 함수 정의
 # ==========================================
 
 def get_file_path(filename):
@@ -158,9 +190,17 @@ def get_base64_of_bin_file(bin_file):
         data = f.read()
     return base64.b64encode(data).decode()
 
-# 한글 폰트 로드
+# 폰트 로드 (Pretendard 우선, 없으면 나눔고딕)
 @st.cache_resource
-def load_korean_font(size=20):
+def load_custom_font(size=20):
+    # 1. Pretendard 확인
+    font_files = ["Pretendard-Bold.ttf", "Pretendard-Medium.ttf", "Pretendard-Regular.ttf"]
+    for f in font_files:
+        path = get_file_path(f)
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    
+    # 2. 없으면 나눔고딕 다운로드 및 사용
     font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
     font_path = "NanumGothic-Bold.ttf"
     if not os.path.exists(font_path):
@@ -174,71 +214,190 @@ def load_korean_font(size=20):
     except:
         return ImageFont.load_default()
 
-# 포스터 생성 (기존 유지)
-def create_warning_poster(warning_summary, total_sites, normal_sites_count):
-    W, H = 800, 1131
+# [수정된 함수] A4 포스터 생성 (폭염 경보/주의보 분리 + 한파 -12/-15 분리)
+def create_warning_poster_v2(full_df, warning_summary):
+    # A4 Size (300dpi)
+    W, H = 2480, 3508
     img = Image.new('RGB', (W, H), color='white')
     draw = ImageDraw.Draw(img)
-    title_font = load_korean_font(50)
-    subtitle_font = load_korean_font(30)
-    content_title_font = load_korean_font(28)
-    content_font = load_korean_font(22)
-    footer_font = load_korean_font(20)
+    
+    # 폰트 사이즈 설정
+    font_title = load_custom_font(140)
+    font_subtitle = load_custom_font(60)
+    font_section = load_custom_font(70)
+    font_content = load_custom_font(50)
+    font_footer = load_custom_font(45)
 
-    header_height = 150
+    # 1. 헤더 (GS건설 현장 기상특보 현황)
+    header_height = 400
     draw.rectangle([(0, 0), (W, header_height)], fill="#005bac")
     
     title_text = "GS건설 현장 기상특보 현황"
-    bbox = draw.textbbox((0, 0), title_text, font=title_font)
-    text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    draw.text(((W - text_w) / 2, (header_height - text_h) / 2 - 10), title_text, font=title_font, fill="white")
+    bbox = draw.textbbox((0, 0), title_text, font=font_title)
+    text_w = bbox[2] - bbox[0]
+    draw.text(((W - text_w) / 2, 120), title_text, font=font_title, fill="white")
 
     current_time = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M 기준')
-    summary_text = f"총 현장: {total_sites}  |  이상 없음: {normal_sites_count}  |  특보 발령: {total_sites - normal_sites_count}"
+    bbox = draw.textbbox((0, 0), current_time, font=font_subtitle)
+    text_w = bbox[2] - bbox[0]
+    draw.text(((W - text_w) / 2, 280), current_time, font=font_subtitle, fill="#dddddd")
+
+    # 2. 데이터 분류 및 필터링 (4개 그룹으로 분리)
+    sites_heat_warning = []  # 폭염 경보
+    sites_heat_advisory = [] # 폭염 주의보
+    sites_cold_15 = []       # 한파 경보 (영하 15도)
+    sites_cold_12 = []       # 한파 주의보 (영하 12도)
     
-    draw.text((50, 180), current_time, font=subtitle_font, fill="#555555")
-    draw.text((50, 230), summary_text, font=content_title_font, fill="#333333")
-    draw.line([(50, 280), (W-50, 280)], fill="#dddddd", width=2)
+    filtered_sites_for_map = [] # 지도용
+    
+    has_heat = False
+    has_cold = False
 
-    y_position = 320
-    if not warning_summary:
-        msg = "현재 발령된 기상 특보가 없습니다."
-        bbox = draw.textbbox((0, 0), msg, font=subtitle_font)
-        msg_w = bbox[2] - bbox[0]
-        draw.text(((W - msg_w) / 2, y_position + 100), msg, font=subtitle_font, fill="#28a745")
+    for w_name, sites in warning_summary.items():
+        # 지도용 데이터 수집 (한파 또는 폭염만)
+        if "한파" in w_name or "폭염" in w_name:
+            for s in sites:
+                site_row = full_df[full_df['현장명'] == s]
+                if not site_row.empty:
+                    filtered_sites_for_map.append(site_row.iloc[0])
+
+        # 리스트용 데이터 분류
+        if "폭염경보" in w_name:
+            sites_heat_warning.extend(sites)
+            has_heat = True
+        elif "폭염주의보" in w_name:
+            sites_heat_advisory.extend(sites)
+            has_heat = True
+        elif "한파경보" in w_name:
+            sites_cold_15.extend(sites)
+            has_cold = True
+        elif "한파주의보" in w_name:
+            sites_cold_12.extend(sites)
+            has_cold = True
+            
+    # 중복 제거 및 정렬
+    sites_heat_warning = sorted(list(set(sites_heat_warning)))
+    sites_heat_advisory = sorted(list(set(sites_heat_advisory)))
+    sites_cold_15 = sorted(list(set(sites_cold_15)))
+    sites_cold_12 = sorted(list(set(sites_cold_12)))
+
+    # 지도 생성을 위한 DF
+    map_df = pd.DataFrame(filtered_sites_for_map) if filtered_sites_for_map else pd.DataFrame(columns=['lat', 'lon', 'warnings', '현장명'])
+
+    # 3. 레이아웃 2분할 (지도 / 리스트)
+    body_y = header_height + 50
+    half_w = W // 2
+    
+    # [Left] 지도 이미지
+    map_img = generate_static_map_image(map_df, width=half_w - 100, height=1200)
+    img.paste(map_img, (50, body_y))
+    draw.rectangle([(50, body_y), (half_w - 50, body_y + 1200)], outline="#cccccc", width=3)
+    
+    # [Right] 특보 리스트 출력 함수
+    list_x = half_w + 50
+    list_y = body_y
+    
+    draw.text((list_x, list_y), "■ 특보 발령 현장 목록", font=font_section, fill="#333333")
+    list_y += 100
+    
+    def draw_site_group(title, color, site_list, current_y):
+        if not site_list: return current_y
+        
+        # 타이틀 출력
+        draw.text((list_x, current_y), title, font=font_section, fill=color)
+        current_y += 70
+        
+        # 현장명 줄바꿈 출력
+        sites_str = ", ".join(site_list)
+        max_width = W - list_x - 50
+        words = sites_str.split(' ')
+        line = ""
+        
+        for word in words:
+            test_line = line + word + " "
+            bbox = draw.textbbox((0, 0), test_line, font=font_content)
+            if (bbox[2] - bbox[0]) > max_width:
+                draw.text((list_x, current_y), line, font=font_content, fill="#555555")
+                line = word + " "
+                current_y += 60
+            else:
+                line = test_line
+        draw.text((list_x, current_y), line, font=font_content, fill="#555555")
+        return current_y + 90 # 그룹 간 간격
+
+    # 출력 순서: 폭염경보 -> 폭염주의보 -> 한파경보(-15) -> 한파주의보(-12)
+    if not (sites_heat_warning or sites_heat_advisory or sites_cold_15 or sites_cold_12):
+        draw.text((list_x, list_y), "현재 한파/폭염 특보 발령 현장이 없습니다.", font=font_content, fill="#28a745")
     else:
-        for w_name, sites in warning_summary.items():
-            color = "red" if "경보" in w_name else "#ff6600"
-            draw.text((50, y_position), f"⚠️ {w_name} ({len(sites)}개소)", font=content_title_font, fill=color)
-            y_position += 45
-            sites_str = ", ".join(sites)
-            margin, max_width = 50, W - 100
-            words = sites_str.split(' ')
-            line = ""
-            for word in words:
-                test_line = line + word + " "
-                bbox = draw.textbbox((0, 0), test_line, font=content_font)
-                if (bbox[2] - bbox[0]) > max_width:
-                    draw.text((margin, y_position), line, font=content_font, fill="#333333")
-                    line = word + " "
-                    y_position += 35
-                else:
-                    line = test_line
-            draw.text((margin, y_position), line, font=content_font, fill="#333333")
-            y_position += 60
-            if y_position > H - 100:
-                draw.text((margin, y_position), "... (이하 생략)", font=content_font, fill="#999999")
-                break
+        # 1. 폭염 경보 (Red)
+        if sites_heat_warning:
+            list_y = draw_site_group(f"🔥 폭염 경보 ({len(sites_heat_warning)}개소)", "#ff0000", sites_heat_warning, list_y)
+            
+        # 2. 폭염 주의보 (Orange)
+        if sites_heat_advisory:
+            list_y = draw_site_group(f"☀️ 폭염 주의보 ({len(sites_heat_advisory)}개소)", "#ff6600", sites_heat_advisory, list_y)
 
-    draw.line([(50, H-80), (W-50, H-80)], fill="#dddddd", width=2)
+        # 3. 영하 15도 이하 (한파경보 - Navy)
+        if sites_cold_15:
+            list_y = draw_site_group(f"❄️ 영하 15도 이하 ({len(sites_cold_15)}개소)", "#000080", sites_cold_15, list_y)
+
+        # 4. 영하 12도 이하 (한파주의보 - Blue)
+        if sites_cold_12:
+            list_y = draw_site_group(f"📉 영하 12도 이하 ({len(sites_cold_12)}개소)", "#1f77b4", sites_cold_12, list_y)
+            
+        # 공간 부족 체크
+        if list_y > (body_y + 1150):
+             draw.text((list_x, body_y + 1150), "... (공간 부족으로 이하 생략)", font=font_content, fill="#999999")
+
+    # 4. 하단 안전보건 정보 (조건부 텍스트)
+    info_y = body_y + 1200 + 80
+    box_margin = 50
+    
+    # (1) 폭염 정보 (경보나 주의보 하나라도 있으면 출력)
+    if has_heat:
+        title = "※ 폭염 시 현장 안전수칙 및 온열질환 안내"
+        # 경보가 있으면 더 진한 빨강
+        color = "#ff0000" if sites_heat_warning else "#ff6600"
+        draw.text((box_margin, info_y), title, font=font_section, fill=color)
+        info_y += 90
+        
+        content = """
+[폭염 5대 기본 수칙] 물, 바람·그늘, 휴식, 보냉장구, 응급조치
+[온열질환 증상] 열사병(의식없음/체온40도↑), 열탈진(땀많음/구토), 열경련(근육경련)
+        """
+        if sites_heat_warning:
+            content += "\n[추가] 폭염 경보 시 무더위 시간대(14:00~17:00) 옥외작업 중지 권고"
+            
+        draw.multiline_text((box_margin + 20, info_y), content.strip(), font=font_content, fill="#333333", spacing=15)
+        info_y += 250 
+
+    # (2) 한파 정보
+    if has_cold:
+        title = "※ 한파(혹한) 시 현장 안전수칙 및 한랭질환 안내"
+        color = "#000080" if sites_cold_15 else "#1f77b4"
+        draw.text((box_margin, info_y), title, font=font_section, fill=color)
+        info_y += 90
+        
+        content = """
+[한파안전 5대 기본수칙] 따뜻한 옷, 따뜻한 쉼터, 따뜻한 물, 작업시간대 조정, 119 신고
+[한랭질환 증상] 저체온증(몸떨림/말어눌), 동상(피부변색/감각저하), 침수병(부종/통증)
+        """
+        if sites_cold_15:
+             content += "\n[추가] 영하 15도 이하 시 옥외작업 시간 단축 및 휴식시간 연장 필수"
+             
+        draw.multiline_text((box_margin + 20, info_y), content.strip(), font=font_content, fill="#333333", spacing=15)
+
+    # 5. 푸터
+    draw.line([(50, H-150), (W-50, H-150)], fill="#dddddd", width=4)
     footer_text = "GS E&C 안전보건팀"
-    bbox = draw.textbbox((0, 0), footer_text, font=footer_font)
+    bbox = draw.textbbox((0, 0), footer_text, font=font_footer)
     f_w = bbox[2] - bbox[0]
-    draw.text(((W - f_w) / 2, H - 50), footer_text, font=footer_font, fill="#999999")
+    draw.text(((W - f_w) / 2, H - 100), footer_text, font=font_footer, fill="#999999")
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG', quality=95)
     return img_byte_arr.getvalue()
+
 
 def dfs_xy_conv(v1, v2):
     RE, GRID = 6371.00877, 5.0
@@ -264,41 +423,28 @@ def dfs_xy_conv(v1, v2):
     y = math.floor(ro - ra * math.cos(theta) + YO + 0.5)
     return int(x), int(y)
 
-# [최적화] 기온 데이터 캐싱 (TTL 10분) - API 호출 최소화
 @st.cache_data(ttl=600)
-# [수정] 서버 시간(UTC) 무시하고 한국 시간(KST) 강제 적용 + 캐시 제거
 def get_current_temp_optimized(lat, lon):
     try:
         nx, ny = dfs_xy_conv(lat, lon)
-        
-        # 1. 한국 시간(KST, UTC+9) 설정
         kst = datetime.timezone(datetime.timedelta(hours=9))
         now = datetime.datetime.now(kst)
-        
-        # 2. 기상청 생성 기준(매시 40분)에 따른 시간 계산
         if now.minute <= 40: 
             target_time = now - datetime.timedelta(hours=1)
         else:
             target_time = now
-            
         base_date = target_time.strftime('%Y%m%d')
         base_time = target_time.strftime('%H00') 
-        
-        # 3. API 호출
         base_url = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
         query_params = f"?serviceKey={API_KEY_ENCODED}&pageNo=1&numOfRows=10&dataType=JSON&base_date={base_date}&base_time={base_time}&nx={nx}&ny={ny}"
-        
         response = requests.get(base_url + query_params, timeout=3)
         data = response.json()
-        
         if data['response']['header']['resultCode'] == '00':
             items = data['response']['body']['items']['item']
             for item in items:
                 if item['category'] == 'T1H': 
-                    # 날짜 표시 포맷 (예: 12월 19일 14:00)
                     formatted_time = f"{base_date[4:6]}월 {base_date[6:8]}일 {base_time[:2]}:00"
                     return float(item['obsrValue']), formatted_time
-                    
         return None, None
     except Exception:
         return None, None
@@ -325,16 +471,12 @@ def get_coordinates(address):
 def load_data_once():
     excel_path = get_file_path(EXCEL_FILENAME)
     cache_path = get_file_path(CACHE_FILENAME)
-    
-    # 캐시 파일 있으면 바로 로드
     if os.path.exists(cache_path):
         try: return pd.read_csv(cache_path)
         except: pass
-    
     if not os.path.exists(excel_path):
         st.error(f"❌ 파일을 찾을 수 없습니다: {excel_path}")
         return pd.DataFrame()
-
     try:
         df = pd.read_excel(excel_path, engine='openpyxl')
         if '주소' in df.columns:
@@ -416,11 +558,9 @@ with st.sidebar:
 # 4. 메인 화면 로직
 # ==========================================
 
-# 로고 로드
 logo_path = get_file_path(LOGO_FILENAME)
 img_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else ""
 
-# [수정] 헤더 레이아웃 개선
 st.markdown(
     f"""
     <div class="custom-header-box">
@@ -456,14 +596,13 @@ if not df.empty:
             else:
                 normal_sites.append(row['현장명'])
 
-    # [1] 상단 지표 (높이 축소됨)
+    # [1] 상단 지표
     m1, m2, m3 = st.columns(3)
     with m1: render_custom_metric("총 현장", f"{len(df)}", color="#333", icon="🏗️")
     with m2: render_custom_metric("특보 발령", f"{len(warn_sites)}", color="#FF4B4B", icon="🚨")
     with m3: render_custom_metric("이상 없음", f"{len(normal_sites)}", color="#00CC96", icon="✅")
     
-    # [2] 기상청 특보 전문 (공간 절약을 위해 Expander 사용)
-    st.write("") # 약간의 여백
+    st.write("") 
     with st.expander("📢 기상청 특보 전문 보기 (클릭하여 펼치기)", expanded=False):
         if full_text:
             text = full_text.replace("o ", "\n o ").strip()
@@ -473,18 +612,13 @@ if not df.empty:
 
     st.divider()
 
-    # =========================================================================
-    # 메인 레이아웃: 좌측(3.5) vs 우측(6.5)
-    # =========================================================================
+    # 메인 레이아웃
     col_left, col_right = st.columns([3.5, 6.5])
 
-    # --------------------------
     # [좌측 패널]
-    # --------------------------
     with col_left:
         st.markdown("##### 🔍 현장 검색")
         site_list = df['현장명'].tolist()
-        # 세션 상태에 따라 인덱스 찾기
         curr_idx = site_list.index(st.session_state.selected_site) if st.session_state.selected_site in site_list else None
         
         selected_option = st.selectbox(
@@ -496,12 +630,10 @@ if not df.empty:
             st.session_state.selected_site = selected_option
             st.rerun()
 
-        # 선택된 현장 정보 표시 (여기가 핵심 최적화 구간)
         if st.session_state.selected_site:
             target_row = df[df['현장명'] == st.session_state.selected_site].iloc[0]
             ws = target_row['warnings'] if target_row['warnings'] else []
             
-            # [최적화] 클릭된 현장의 기온만 API 호출 (Cache 적용됨)
             current_temp, temp_time = None, None
             if pd.notna(target_row['lat']):
                 current_temp, temp_time = get_current_temp_optimized(target_row['lat'], target_row['lon'])
@@ -516,7 +648,6 @@ if not df.empty:
                     <div class='site-addr'>{target_row['주소']}</div>
                 """, unsafe_allow_html=True)
                 
-                # 기온 및 시간 표시
                 if current_temp is not None:
                     st.markdown(f"""
                         <div>
@@ -532,20 +663,20 @@ if not df.empty:
                     for w in ws:
                         color_md = ":red" if "경보" in w else ":orange"
                         st.markdown(f"{color_md}[**⚠️ {w}**]")
-
         else:
             st.info("지도에서 마커를 클릭하거나 위에서 현장을 검색하세요.")
 
         st.write("") 
         
         # 특보 리스트 및 다운로드
-        st.markdown("##### 📋 특보 현황 요약")
-        # 높이를 고정하여 스크롤 유도 (전체 페이지 길이 단축)
+        st.markdown("##### 📋 특보 현황 요약 및 포스터")
         with st.container(height=300, border=True):
-            poster_img_bytes = create_warning_poster(warning_summary, len(df), len(normal_sites))
+            # [수정된 함수 호출] v2 포스터 생성
+            poster_img_bytes = create_warning_poster_v2(df, warning_summary)
+            
             st.download_button(
-                "🖼️ 현황 포스터 다운로드", data=poster_img_bytes,
-                file_name=f"기상특보_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
+                "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
+                file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
                 mime="image/jpeg", use_container_width=True
             )
             st.divider()
@@ -557,13 +688,9 @@ if not df.empty:
             else:
                 st.caption("현재 특보 발령 현장이 없습니다.")
 
-    # --------------------------
     # [우측 패널] - 지도
-    # --------------------------
     with col_right:
         valid_coords = df.dropna(subset=['lat', 'lon'])
-        
-        # 지도 정확도 안내 문구 추가
         st.markdown("<div class='map-disclaimer'>⚠️ 본 지도는 OpenStreetMap(무료) 기반으로 실제 위치와 약간의 오차가 있을 수 있습니다.</div>", unsafe_allow_html=True)
 
         if not valid_coords.empty:
@@ -574,27 +701,23 @@ if not df.empty:
                 else:
                     c_lat, c_lon, z_start = 36.5, 127.5, 7
             else:
-                c_lat, c_lon, z_start = 36.3, 127.8, 7  # 중심점 조정
+                c_lat, c_lon, z_start = 36.3, 127.8, 7 
             
-            # 지도 생성
-            m = folium.Map(location=[c_lat, c_lon], zoom_start=z_start, tiles='cartodbpositron') # 깔끔한 타일로 변경
+            m = folium.Map(location=[c_lat, c_lon], zoom_start=z_start, tiles='cartodbpositron') 
 
             for i, row in valid_coords.iterrows():
                 ws = row['warnings'] if row['warnings'] else []
                 color, icon_name = get_icon_and_color(ws)
                 warn_msg = ", ".join(ws) if ws else "이상 없음"
                 
-                # 툴팁에 현장명 표시
                 folium.Marker(
                     [row['lat'], row['lon']],
                     tooltip=f"{row['현장명']} : {warn_msg}",
                     icon=folium.Icon(color=color, icon=icon_name, prefix='fa')
                 ).add_to(m)
             
-            # 높이 약간 축소하여 한눈에 들어오게
             map_data = st_folium(m, width=None, height=500) 
             
-            # 지도 클릭 이벤트 처리
             if map_data and map_data.get("last_object_clicked_tooltip"):
                 clicked_info = map_data["last_object_clicked_tooltip"]
                 if clicked_info:
@@ -602,6 +725,3 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
-
-
-
