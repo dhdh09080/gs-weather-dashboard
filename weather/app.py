@@ -187,6 +187,7 @@ def create_warning_poster(full_df, warning_summary):
     text_w = bbox[2] - bbox[0]
     draw.text(((W - text_w) / 2, 140), title_text, font=font_title, fill="white")
 
+    kst = pytz.timezone('Asia/Seoul')
     current_time = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M 기준')
     bbox = draw.textbbox((0, 0), current_time, font=font_subtitle)
     text_w = bbox[2] - bbox[0]
@@ -656,6 +657,7 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
 
 
 
