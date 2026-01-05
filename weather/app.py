@@ -73,10 +73,10 @@ if 'weather_data' not in st.session_state:
 if 'selected_site' not in st.session_state:
     st.session_state.selected_site = None
 
-geolocator = Nominatim(user_agent="korea_weather_guard_gs_v2", timeout=15)
+geolocator = Nominatim(user_agent="korea_weather_guard_gs_v3", timeout=15)
 
 # ==========================================
-# 3. 지도 이미지 생성을 위한 유틸리티 (Static Map)
+# 3. 지도 이미지 생성을 위한 유틸리티
 # ==========================================
 def deg2num(lat_deg, lon_deg, zoom):
     lat_rad = math.radians(lat_deg)
@@ -86,11 +86,8 @@ def deg2num(lat_deg, lon_deg, zoom):
     return (xtile, ytile)
 
 def generate_static_map_image(df_target, width=1200, height=1200):
-    # [안전장치] 빈 캔버스 반환
     fallback_img = Image.new('RGB', (width, height), (240, 240, 240))
-    
-    if df_target.empty:
-        return fallback_img
+    if df_target.empty: return fallback_img
 
     try:
         min_lat, max_lat = df_target['lat'].min(), df_target['lat'].max()
@@ -122,17 +119,15 @@ def generate_static_map_image(df_target, width=1200, height=1200):
         user_agent = "Mozilla/5.0 (GS_Weather_Poster/1.0)"
         headers = {"User-Agent": user_agent}
         
-        # 타일 다운로드 (에러 발생 시 무시하고 진행)
         for x in range(x_min, x_max + 1):
             for y in range(y_min, y_max + 1):
                 url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
                 try:
-                    resp = requests.get(url, headers=headers, timeout=0.5) # 타임아웃 짧게
+                    resp = requests.get(url, headers=headers, timeout=0.5)
                     if resp.status_code == 200:
                         tile = Image.open(io.BytesIO(resp.content))
                         map_img.paste(tile, ((x - x_min) * tile_size, (y - y_min) * tile_size))
-                except:
-                    pass # 타일 하나 실패해도 계속 진행
+                except: pass
 
         def get_pixel_coords(lat, lon):
             n = 2.0 ** zoom
@@ -143,23 +138,19 @@ def generate_static_map_image(df_target, width=1200, height=1200):
             return px, py
 
         draw = ImageDraw.Draw(map_img)
-        
         for idx, row in df_target.iterrows():
             px, py = get_pixel_coords(row['lat'], row['lon'])
             warnings = row['warnings']
-            
             color = "gray"
             radius = 12
             if warnings:
                 if any("폭염" in w for w in warnings): color = "red"
                 elif any("한파" in w for w in warnings): color = "blue"
                 else: continue 
-                
                 draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=color, outline="white", width=3)
 
         return map_img.resize((width, height), Image.LANCZOS)
     except:
-        # 지도 생성 중 무슨 에러가 나도 빈 이미지는 리턴
         return fallback_img
 
 # ==========================================
@@ -177,46 +168,34 @@ def get_base64_of_bin_file(bin_file):
 
 @st.cache_resource
 def load_custom_font(size=20):
-    # [안전장치] 폰트 로드 실패 시 무조건 기본 폰트 사용
     try:
         font_files = ["Pretendard-Bold.ttf", "Pretendard-Medium.ttf", "Pretendard-Regular.ttf"]
         for f in font_files:
             path = get_file_path(f)
-            if os.path.exists(path):
-                return ImageFont.truetype(path, size)
+            if os.path.exists(path): return ImageFont.truetype(path, size)
         
-        # 다운로드 시도
         font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
         font_path = "NanumGothic-Bold.ttf"
         if not os.path.exists(font_path):
             try:
                 r = requests.get(font_url, timeout=3)
-                with open(font_path, "wb") as f:
-                    f.write(r.content)
-            except:
-                pass 
-        
-        if os.path.exists(font_path):
-            return ImageFont.truetype(font_path, size)
-    except:
-        pass
-    
+                with open(font_path, "wb") as f: f.write(r.content)
+            except: pass 
+        if os.path.exists(font_path): return ImageFont.truetype(font_path, size)
+    except: pass
     return ImageFont.load_default()
 
-# [핵심] 포스터 생성 함수 (A4, 2분할, 한파/폭염만 표시)
 def create_warning_poster(full_df, warning_summary):
-    W, H = 2480, 3508  # A4 300dpi
+    W, H = 2480, 3508
     img = Image.new('RGB', (W, H), color='white')
     draw = ImageDraw.Draw(img)
     
-    # 폰트 로딩 (안전장치 적용됨)
     font_title = load_custom_font(140)
     font_subtitle = load_custom_font(60)
     font_section = load_custom_font(70)
     font_content = load_custom_font(50)
     font_footer = load_custom_font(45)
 
-    # 헤더
     header_height = 400
     draw.rectangle([(0, 0), (W, header_height)], fill="#005bac")
     
@@ -230,25 +209,17 @@ def create_warning_poster(full_df, warning_summary):
     text_w = bbox[2] - bbox[0]
     draw.text(((W - text_w) / 2, 280), current_time, font=font_subtitle, fill="#dddddd")
 
-    # [데이터 필터링 로직]
-    sites_heat_warning = []  # 폭염 경보
-    sites_heat_advisory = [] # 폭염 주의보
-    sites_cold_15 = []       # 한파 경보 (영하 15도)
-    sites_cold_12 = []       # 한파 주의보 (영하 12도)
+    sites_heat_warning = []
+    sites_heat_advisory = []
+    sites_cold_15 = []
+    sites_cold_12 = []
     
     filtered_sites_for_map = [] 
-    
     has_heat = False
     has_cold = False
 
+    # [중요] 이미 데이터 로딩 단계에서 필터링이 되었지만, 한번 더 안전장치
     for w_name, sites in warning_summary.items():
-        # '건조'는 여기서 제외됨
-        if "한파" in w_name or "폭염" in w_name:
-            for s in sites:
-                site_row = full_df[full_df['현장명'] == s]
-                if not site_row.empty:
-                    filtered_sites_for_map.append(site_row.iloc[0])
-
         if "폭염경보" in w_name:
             sites_heat_warning.extend(sites)
             has_heat = True
@@ -261,19 +232,22 @@ def create_warning_poster(full_df, warning_summary):
         elif "한파주의보" in w_name:
             sites_cold_12.extend(sites)
             has_cold = True
+        # 한파/폭염인 경우에만 지도용 리스트에 추가
+        if "한파" in w_name or "폭염" in w_name:
+            for s in sites:
+                site_row = full_df[full_df['현장명'] == s]
+                if not site_row.empty: filtered_sites_for_map.append(site_row.iloc[0])
             
     sites_heat_warning = sorted(list(set(sites_heat_warning)))
     sites_heat_advisory = sorted(list(set(sites_heat_advisory)))
     sites_cold_15 = sorted(list(set(sites_cold_15)))
     sites_cold_12 = sorted(list(set(sites_cold_12)))
 
-    # 지도 생성 (에러나면 빈 지도 반환)
     map_df = pd.DataFrame(filtered_sites_for_map) if filtered_sites_for_map else pd.DataFrame(columns=['lat', 'lon', 'warnings', '현장명'])
     
     body_y = header_height + 50
     half_w = W // 2
     
-    # 지도 그리기
     map_img = generate_static_map_image(map_df, width=half_w - 100, height=1200)
     img.paste(map_img, (50, body_y))
     draw.rectangle([(50, body_y), (half_w - 50, body_y + 1200)], outline="#cccccc", width=3)
@@ -299,12 +273,10 @@ def create_warning_poster(full_df, warning_summary):
                 draw.text((list_x, current_y), line, font=font_content, fill="#555555")
                 line = word + " "
                 current_y += 60
-            else:
-                line = test_line
+            else: line = test_line
         draw.text((list_x, current_y), line, font=font_content, fill="#555555")
         return current_y + 90 
 
-    # 목록 출력
     if not (sites_heat_warning or sites_heat_advisory or sites_cold_15 or sites_cold_12):
         draw.text((list_x, list_y), "현재 한파/폭염 특보 발령 현장이 없습니다.", font=font_content, fill="#28a745")
     else:
@@ -320,7 +292,6 @@ def create_warning_poster(full_df, warning_summary):
         if list_y > (body_y + 1150):
              draw.text((list_x, body_y + 1150), "... (공간 부족으로 이하 생략)", font=font_content, fill="#999999")
 
-    # 하단 안전보건 정보
     info_y = body_y + 1200 + 80
     box_margin = 50
     
@@ -549,6 +520,10 @@ if not df.empty:
             addr = str(row.get('주소', ''))
             keywords = [t[:-1] for t in addr.replace(',', ' ').split() if t.endswith(('시', '군')) and len(t[:-1]) >= 2]
             w_list = analyze_all_warnings(full_text, keywords) if keywords else []
+            
+            # [🔥 핵심 수정: 여기서 건조 관련 데이터 삭제]
+            w_list = [w for w in w_list if "한파" in w or "폭염" in w]
+            
             df.at[i, 'warnings'] = w_list
             if w_list:
                 warn_sites.append(f"{row['현장명']}")
@@ -629,7 +604,6 @@ if not df.empty:
         
         st.markdown("##### 📋 특보 현황 요약 및 포스터")
         with st.container(height=300, border=True):
-            # [수정됨] 에러 처리 및 스피너 추가
             try:
                 poster_img_bytes = create_warning_poster(df, warning_summary)
                 
@@ -643,10 +617,10 @@ if not df.empty:
                 
             st.divider()
 
-            # [UI 리스트에도 건조특보 제외 로직 추가]
             has_valid_warnings = False
             if warning_summary:
                 for w_name, sites in warning_summary.items():
+                    # [여기서도 한파/폭염만 출력]
                     if "한파" in w_name or "폭염" in w_name:
                         has_valid_warnings = True
                         color_md = ":red" if "경보" in w_name else ":orange"
