@@ -3,9 +3,8 @@ import pandas as pd
 import requests
 import datetime
 import re
-# folium 관련 임포트는 지도 제거로 인해 필요 없지만, 기존 코드 호환성을 위해 유지하거나 주석 처리
-# import folium
-# from streamlit_folium import st_folium
+import folium
+from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
 import time
 import math
@@ -18,12 +17,11 @@ import io
 # 1. 페이지 설정
 # ==========================================
 st.set_page_config(
-    page_title="GS건설 현장 기상특보 (레이아웃 개선 테스트)",
+    page_title="GS건설 현장 기상특보",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# (스타일 설정은 기존과 동일하여 생략... 필요시 이전 코드에서 복사해서 사용하세요)
 st.markdown("""
     <style>
         .block-container { padding-top: 3rem; padding-bottom: 1rem; padding-left: 1rem; padding-right: 1rem; }
@@ -57,7 +55,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-
 # ==========================================
 # 2. 설정 & 초기화
 # ==========================================
@@ -76,15 +73,10 @@ if 'weather_data' not in st.session_state:
 if 'selected_site' not in st.session_state:
     st.session_state.selected_site = None
 
-geolocator = Nominatim(user_agent="korea_weather_guard_gs_layout_test", timeout=15)
+geolocator = Nominatim(user_agent="korea_weather_guard_gs_final_layout", timeout=15)
 
 # ==========================================
-# 3. (지도 관련 함수 제거됨)
-# ==========================================
-# generate_static_map_image 및 deg2num 함수 삭제
-
-# ==========================================
-# 4. 함수 정의
+# 3. 함수 정의
 # ==========================================
 
 def get_file_path(filename):
@@ -116,57 +108,27 @@ def load_custom_font(size=20):
     return ImageFont.load_default()
 
 # -----------------------------------------------------------
-# [🔥 핵심 수정] 포스터 생성 함수 (박스형 레이아웃 + 지도 제거 + 꽉 찬 구성)
+# [🔥 핵심 수정] 포스터 생성 함수 (지도 제거, 박스형 레이아웃, A4 꽉 채우기)
 # -----------------------------------------------------------
 def create_warning_poster(full_df, warning_summary):
     # A4 Size (300dpi)
     W, H = 2480, 3508
-    img = Image.new('RGB', (W, H), color='#F5F7FA') # 배경색 약간 회색으로 변경
+    img = Image.new('RGB', (W, H), color='#FFFFFF')
     draw = ImageDraw.Draw(img)
     
-    # 폰트 로드 (고정 사이즈 사용 - 박스 레이아웃에 적합)
-    font_title = load_custom_font(130)
-    font_subtitle = load_custom_font(55)
-    font_section_title = load_custom_font(70) # 섹션 타이틀
-    font_box_title = load_custom_font(65)     # 박스 내 특보 타이틀
-    font_content = load_custom_font(45)       # 현장명 리스트
-    font_safety_title = load_custom_font(70)  # 안전수칙 타이틀
-    font_safety_content = load_custom_font(50) # 안전수칙 내용
-    font_footer = load_custom_font(40)
-
-    # 레이아웃 설정값
-    margin_x = 100
-    content_width = W - (margin_x * 2)
-    box_padding = 50
-    box_radius = 30
-
-    # 1. 헤더 그리기
-    header_height = 400
-    draw.rectangle([(0, 0), (W, header_height)], fill="#005bac")
-    
-    title_text = "GS건설 현장 기상특보 현황"
-    bbox = draw.textbbox((0, 0), title_text, font=font_title)
-    text_w = bbox[2] - bbox[0]
-    draw.text(((W - text_w) / 2, 120), title_text, font=font_title, fill="white")
-
-    current_time = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M 기준')
-    bbox = draw.textbbox((0, 0), current_time, font=font_subtitle)
-    text_w = bbox[2] - bbox[0]
-    draw.text(((W - text_w) / 2, 280), current_time, font=font_subtitle, fill="#dddddd")
-
-    # 2. 데이터 분류
+    # 데이터 분류
     sites_heat_warning = []
     sites_heat_advisory = []
     sites_cold_15 = []
     sites_cold_12 = []
-    sites_dry = [] # 건조 추가
     sites_others = [] 
     
     has_heat = False
     has_cold = False
 
     for w_name, sites in warning_summary.items():
-        # [TEST MODE] 건조 필터링 해제 상태
+        if "건조" in w_name: continue # 건조 제외
+
         if "폭염경보" in w_name:
             sites_heat_warning.extend(sites); has_heat = True
         elif "폭염주의보" in w_name:
@@ -175,8 +137,6 @@ def create_warning_poster(full_df, warning_summary):
             sites_cold_15.extend(sites); has_cold = True
         elif "한파주의보" in w_name:
             sites_cold_12.extend(sites); has_cold = True
-        elif "건조" in w_name:
-            sites_dry.extend(sites)
         else:
             sites_others.append((w_name, sites))
             
@@ -184,101 +144,130 @@ def create_warning_poster(full_df, warning_summary):
     sites_heat_advisory = sorted(list(set(sites_heat_advisory)))
     sites_cold_15 = sorted(list(set(sites_cold_15)))
     sites_cold_12 = sorted(list(set(sites_cold_12)))
-    sites_dry = sorted(list(set(sites_dry)))
 
-    # 3. 본문 시작 (지도 없이 바로 리스트 시작)
-    current_y = header_height + 80
+    # [폰트 사이즈 자동 조절]
+    total_count = len(sites_heat_warning) + len(sites_heat_advisory) + len(sites_cold_15) + len(sites_cold_12)
+    for _, s in sites_others: total_count += len(s)
+
+    # 기본값 (크게)
+    base_size = 55
+    line_sp = 80
     
-    draw.text((margin_x, current_y), "■ 특보 발령 현장 목록", font=font_section_title, fill="#333333")
-    current_y += 100
+    # 현장이 많으면 축소
+    if total_count > 100: base_size = 30; line_sp = 45
+    elif total_count > 60: base_size = 35; line_sp = 55
+    elif total_count > 30: base_size = 45; line_sp = 65
 
-    # [헬퍼 함수] 텍스트 줄바꿈 계산 및 박스 그리기
-    def draw_warning_box(title_text, title_color, bg_color, border_color, site_list, start_y):
-        if not site_list: return start_y
+    # 폰트 로드
+    font_title = load_custom_font(130)
+    font_subtitle = load_custom_font(55)
+    font_section = load_custom_font(75)
+    font_box_title = load_custom_font(65)
+    font_content = load_custom_font(base_size)
+    font_safety_title = load_custom_font(70)
+    font_safety_content = load_custom_font(50)
+    font_footer = load_custom_font(40)
+
+    # 레이아웃 설정
+    margin_x = 100
+    content_width = W - (margin_x * 2)
+    box_padding = 60
+    box_radius = 40
+
+    # 1. 헤더
+    header_height = 450
+    draw.rectangle([(0, 0), (W, header_height)], fill="#005bac")
+    
+    title_text = "GS건설 현장 기상특보 현황"
+    bbox = draw.textbbox((0, 0), title_text, font=font_title)
+    text_w = bbox[2] - bbox[0]
+    draw.text(((W - text_w) / 2, 140), title_text, font=font_title, fill="white")
+
+    current_time = datetime.datetime.now().strftime('%Y년 %m월 %d일 %H:%M 기준')
+    bbox = draw.textbbox((0, 0), current_time, font=font_subtitle)
+    text_w = bbox[2] - bbox[0]
+    draw.text(((W - text_w) / 2, 320), current_time, font=font_subtitle, fill="#dddddd")
+
+    # 2. 특보 리스트 (박스형)
+    current_y = header_height + 100
+    draw.text((margin_x, current_y), "■ 특보 발령 현장 목록", font=font_section, fill="#333333")
+    current_y += 120
+
+    def draw_warning_box(title, title_color, bg_color, border_color, sites, start_y):
+        if not sites: return start_y
         
-        # 1) 텍스트 줄바꿈 계산
-        sites_str = ", ".join(site_list)
-        max_text_width = content_width - (box_padding * 2)
-        words = sites_str.split(' ')
+        # 텍스트 줄바꿈 계산
+        sites_str = ", ".join(sites)
+        max_w = content_width - (box_padding * 2)
         lines = []
-        current_line = ""
+        words = sites_str.split(' ')
+        curr_line = ""
         for word in words:
-            test_line = current_line + word + " "
-            bbox = draw.textbbox((0, 0), test_line, font=font_content)
-            if (bbox[2] - bbox[0]) > max_text_width:
-                lines.append(current_line)
-                current_line = word + " "
+            test_line = curr_line + word + " "
+            if draw.textbbox((0, 0), test_line, font=font_content)[2] > max_w:
+                lines.append(curr_line)
+                curr_line = word + " "
             else:
-                current_line = test_line
-        if current_line: lines.append(current_line)
+                curr_line = test_line
+        if curr_line: lines.append(curr_line)
         
-        # 2) 박스 높이 계산
-        line_height = 60
-        text_block_height = len(lines) * line_height
-        box_height = box_padding + 80 + 30 + text_block_height + box_padding # 패딩+타이틀+간격+텍스트+패딩
-        box_end_y = start_y + box_height
+        # 박스 그리기
+        box_h = box_padding * 2 + 80 + (len(lines) * line_sp) + 20
+        draw.rounded_rectangle([(margin_x, start_y), (W - margin_x, start_y + box_h)], 
+                               radius=box_radius, fill=bg_color, outline=border_color, width=5)
         
-        # 3) 박스 그리기 (배경 및 테두리)
-        draw.rounded_rectangle([(margin_x, start_y), (W - margin_x, box_end_y)], 
-                               radius=box_radius, fill=bg_color, outline=border_color, width=4)
-        
-        # 4) 내용 쓰기
-        text_x = margin_x + box_padding
-        text_y = start_y + box_padding
-        # 타이틀
-        draw.text((text_x, text_y), title_text, font=font_box_title, fill=title_color)
-        text_y += 80 + 30 # 타이틀 높이 + 간격
-        # 현장 리스트
+        # 텍스트 쓰기
+        tx, ty = margin_x + box_padding, start_y + box_padding
+        draw.text((tx, ty), title, font=font_box_title, fill=title_color)
+        ty += 100
         for line in lines:
-            draw.text((text_x, text_y), line, font=font_content, fill="#444444")
-            text_y += line_height
+            draw.text((tx, ty), line, font=font_content, fill="#333333")
+            ty += line_sp
             
-        return box_end_y + 50 # 다음 박스 시작 위치 (간격 50)
+        return start_y + box_h + 60 # 다음 박스 위치
 
-    # 박스 순차적 그리기
-    no_warning = True
+    # 박스 순서대로 그리기
+    is_empty = True
     if sites_heat_warning:
-        current_y = draw_warning_box(f"🔥 폭염 경보 ({len(sites_heat_warning)}개소)", "#d32f2f", "#ffcdd2", "#e57373", sites_heat_warning, current_y)
-        no_warning = False
+        current_y = draw_warning_box(f"🔥 폭염 경보 ({len(sites_heat_warning)}개소)", "#d32f2f", "#ffebee", "#ffcdd2", sites_heat_warning, current_y)
+        is_empty = False
     if sites_heat_advisory:
-        current_y = draw_warning_box(f"☀️ 폭염 주의보 ({len(sites_heat_advisory)}개소)", "#f57c00", "#ffe0b2", "#ffb74d", sites_heat_advisory, current_y)
-        no_warning = False
+        current_y = draw_warning_box(f"☀️ 폭염 주의보 ({len(sites_heat_advisory)}개소)", "#e65100", "#fff3e0", "#ffe0b2", sites_heat_advisory, current_y)
+        is_empty = False
     if sites_cold_15:
-        current_y = draw_warning_box(f"❄️ 한파 경보 (영하 15도 이하, {len(sites_cold_15)}개소)", "#1a237e", "#c5cae9", "#7986cb", sites_cold_15, current_y)
-        no_warning = False
+        current_y = draw_warning_box(f"❄️ 한파 경보 (영하 15도 이하, {len(sites_cold_15)}개소)", "#1a237e", "#e8eaf6", "#c5cae9", sites_cold_15, current_y)
+        is_empty = False
     if sites_cold_12:
-        current_y = draw_warning_box(f"📉 한파 주의보 (영하 12도 이하, {len(sites_cold_12)}개소)", "#0277bd", "#b3e5fc", "#4fc3f7", sites_cold_12, current_y)
-        no_warning = False
-    if sites_dry:
-        current_y = draw_warning_box(f"🍂 건조 특보 ({len(sites_dry)}개소)", "#e65100", "#ffccbc", "#ff8a65", sites_dry, current_y)
-        no_warning = False
+        current_y = draw_warning_box(f"📉 한파 주의보 (영하 12도 이하, {len(sites_cold_12)}개소)", "#0277bd", "#e1f5fe", "#b3e5fc", sites_cold_12, current_y)
+        is_empty = False
     for w_name, s_list in sites_others:
-        current_y = draw_warning_box(f"⚠️ {w_name} ({len(s_list)}개소)", "#4a148c", "#e1bee7", "#ba68c8", s_list, current_y)
-        no_warning = False
+        color = "#4a148c"; bg = "#f3e5f5"; bd = "#e1bee7"
+        if "태풍" in w_name: color="#b71c1c"; bg="#ffebee"; bd="#ffcdd2"
+        elif "호우" in w_name: color="#0d47a1"; bg="#e3f2fd"; bd="#bbdefb"
+        current_y = draw_warning_box(f"⚠️ {w_name} ({len(s_list)}개소)", color, bg, bd, s_list, current_y)
+        is_empty = False
 
-    if no_warning:
-        draw.rounded_rectangle([(margin_x, current_y), (W - margin_x, current_y + 200)], radius=box_radius, fill="#e8f5e9", outline="#81c784", width=4)
-        draw.text((margin_x + 50, current_y + 70), "현재 건설안전 관련 기상 특보가 없습니다.", font=font_box_title, fill="#2e7d32")
-        current_y += 250
+    if is_empty:
+        draw.rounded_rectangle([(margin_x, current_y), (W - margin_x, current_y + 300)], radius=box_radius, fill="#f1f8e9", outline="#c8e6c9", width=5)
+        draw.text((margin_x + 60, current_y + 110), "현재 건설안전 관련 기상 특보가 없습니다.", font=font_box_title, fill="#33691e")
+        current_y += 300
 
-    # 4. 하단 안전보건 정보 (박스형, 하단 고정)
-    # 하단 영역 계산: 푸터 위쪽으로 공간 확보
-    bottom_area_start = H - 1300 # 하단에서 1300픽셀 위부터 시작
-    if current_y < bottom_area_start:
-        current_y = bottom_area_start # 내용이 적어도 하단으로 밀어내기
+    # 3. 하단 안전수칙 (박스형, 하단 고정)
+    bottom_start_y = H - 1400 # 하단 공간 확보
+    if current_y < bottom_start_y: current_y = bottom_start_y
 
-    def draw_safety_box(title, content, title_color, bg_color, border_color, start_y):
-        box_height = 550 # 안전수칙 박스 높이 고정
-        box_end_y = start_y + box_height
-        draw.rounded_rectangle([(margin_x, start_y), (W - margin_x, box_end_y)], 
-                               radius=box_radius, fill=bg_color, outline=border_color, width=4)
+    def draw_safety_box(title, content, color_set, start_y):
+        # color_set: (title_color, bg_color, border_color)
+        t_col, bg_col, bd_col = color_set
+        box_h = 600
+        draw.rounded_rectangle([(margin_x, start_y), (W - margin_x, start_y + box_h)], 
+                               radius=box_radius, fill=bg_col, outline=bd_col, width=5)
         
-        text_x = margin_x + box_padding
-        text_y = start_y + box_padding
-        draw.text((text_x, text_y), title, font=font_safety_title, fill=title_color)
-        text_y += 100
-        draw.multiline_text((text_x + 20, text_y), content.strip(), font=font_safety_content, fill="#333333", spacing=30)
-        return box_end_y + 50
+        tx, ty = margin_x + box_padding, start_y + box_padding
+        draw.text((tx, ty), title, font=font_safety_title, fill=t_col)
+        ty += 110
+        draw.multiline_text((tx + 20, ty), content.strip(), font=font_safety_content, fill="#333333", spacing=35)
+        return start_y + box_h + 60
 
     if has_heat:
         content = """
@@ -287,30 +276,30 @@ def create_warning_poster(full_df, warning_summary):
 • 열사병: 체온 40℃ 이상, 의식 상실 (즉시 119)
 • 열탈진/경련: 과도한 땀, 두통, 구토, 근육 경련 (그늘 휴식, 수분 섭취)
         """
-        current_y = draw_safety_box("※ 폭염 시 현장 안전수칙 및 온열질환 안내", content, "#d32f2f", "#ffebee", "#ef9a9a", current_y)
+        current_y = draw_safety_box("※ 폭염 시 현장 안전수칙 및 온열질환 안내", content, ("#b71c1c", "#ffebee", "#ef9a9a"), current_y)
 
     if has_cold:
         content = """
-[한파 5대 기본 수칙] 따뜻한 옷/물/쉼터, 작업시간 조정, 119 신고
+[한파 5대 기본 수칙] 따뜻한 옷, 따뜻한 쉼터, 따뜻한 물, 작업시간대 조정, 119 신고
 [한랭질환 주요 증상]
 • 저체온증: 몸 떨림 멈춤, 착란, 혼수 상태 (즉시 119, 보온)
 • 동상/침수병: 피부 변색(흰색/검은색), 감각 저하 (따뜻한 물에 담그기)
         """
-        current_y = draw_safety_box("※ 한파(혹한) 시 현장 안전수칙 및 한랭질환 안내", content, "#1a237e", "#e8eaf6", "#9fa8da", current_y)
+        current_y = draw_safety_box("※ 한파(혹한) 시 현장 안전수칙 및 한랭질환 안내", content, ("#1a237e", "#e8eaf6", "#9fa8da"), current_y)
 
-    # 5. 푸터
-    draw.line([(50, H-150), (W-50, H-150)], fill="#dddddd", width=4)
+    # 4. 푸터
+    draw.line([(50, H-150), (W-50, H-150)], fill="#cccccc", width=5)
     footer_text = "GS E&C 안전보건팀"
     bbox = draw.textbbox((0, 0), footer_text, font=font_footer)
     f_w = bbox[2] - bbox[0]
-    draw.text(((W - f_w) / 2, H - 100), footer_text, font=font_footer, fill="#777777")
+    draw.text(((W - f_w) / 2, H - 100), footer_text, font=font_footer, fill="#888888")
 
     img_byte_arr = io.BytesIO()
     img.save(img_byte_arr, format='JPEG', quality=95)
     return img_byte_arr.getvalue()
 
 # ==========================================
-# 5. 좌표 변환 및 API (지도 관련 함수 제거됨)
+# 5. 좌표 변환 및 API
 # ==========================================
 def dfs_xy_conv(v1, v2):
     RE, GRID = 6371.00877, 5.0
@@ -422,24 +411,27 @@ def get_weather_status():
         return items[0].get('t6', '')
     except: return None
 
-# [TEST MODE: 건조 포함]
+# [건조 제외]
 def analyze_all_warnings(full_text, keywords):
     if not full_text: return []
     clean_text = full_text.replace('\r', ' ').replace('\n', ' ')
     detected_warnings = []
     matches = re.finditer(r"o\s*([^:]+)\s*:\s*(.*?)(?=o\s|$)", clean_text)
     
-    ALLOWED_KEYWORDS = ["한파", "폭염", "호우", "대설", "태풍", "강풍", "건조"] 
+    ALLOWED_KEYWORDS = ["한파", "폭염", "호우", "대설", "태풍", "강풍"]
     
     for match in matches:
         w_name = match.group(1).strip()
         content = match.group(2)
         
+        if "건조" in w_name: continue
+            
         is_allowed = False
         for allowed in ALLOWED_KEYWORDS:
             if allowed in w_name:
                 is_allowed = True
                 break
+        
         if not is_allowed: continue 
 
         for key in keywords:
@@ -483,8 +475,6 @@ with st.sidebar:
 # ==========================================
 # 4. 메인 화면 로직
 # ==========================================
-# (메인 화면 로직은 기존과 동일하므로 생략합니다. 필요시 이전 코드에서 복사하세요.)
-# 다만, 지도 표시 부분(folium)은 제거되었으므로 해당 부분 코드는 주석 처리하거나 삭제해야 합니다.
 
 logo_path = get_file_path(LOGO_FILENAME)
 img_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else ""
@@ -525,30 +515,6 @@ if not df.empty:
             else:
                 normal_sites.append(row['현장명'])
 
-    # [🔥 중요] 강제 테스트 데이터 주입 (레이아웃 확인용)
-    if not df.empty:
-        sites = df['현장명'].tolist()
-        # 건조주의보 10개 (테스트용)
-        fake_dry = sites[:10] if len(sites) >= 10 else sites
-        if "건조주의보" not in warning_summary: warning_summary["건조주의보"] = []
-        warning_summary["건조주의보"].extend(fake_dry)
-        warning_summary["건조주의보"] = list(set(warning_summary["건조주의보"]))
-        
-        # 한파주의보 5개 (테스트용)
-        fake_cold = sites[10:15] if len(sites) >= 15 else []
-        if fake_cold:
-            if "한파주의보" not in warning_summary: warning_summary["한파주의보"] = []
-            warning_summary["한파주의보"].extend(fake_cold)
-            warning_summary["한파주의보"] = list(set(warning_summary["한파주의보"]))
-
-        # 메인 화면 집계 갱신
-        warn_sites = []
-        for s_list in warning_summary.values():
-            warn_sites.extend(s_list)
-        warn_sites = list(set(warn_sites))
-        normal_sites = [s for s in sites if s not in warn_sites]
-
-
     m1, m2, m3 = st.columns(3)
     with m1: render_custom_metric("총 현장", f"{len(df)}", color="#333", icon="🏗️")
     with m2: render_custom_metric("특보 발령", f"{len(warn_sites)}", color="#FF4B4B", icon="🚨")
@@ -564,91 +530,118 @@ if not df.empty:
 
     st.divider()
 
-    # [지도 제거로 인한 레이아웃 변경]
-    # col_left, col_right = st.columns([3.5, 6.5]) -> 단일 컬럼으로 변경
-    
-    st.markdown("##### 🔍 현장 검색")
-    site_list = df['현장명'].tolist()
-    curr_idx = site_list.index(st.session_state.selected_site) if st.session_state.selected_site in site_list else None
-    
-    selected_option = st.selectbox(
-        "현장 선택", site_list, index=curr_idx,
-        placeholder="현장명을 입력하세요", label_visibility="collapsed"
-    )
-    
-    if selected_option != st.session_state.selected_site:
-        st.session_state.selected_site = selected_option
-        st.rerun()
+    # [수정됨] 메인 UI는 다시 2분할 (지도 포함)
+    col_left, col_right = st.columns([3.5, 6.5])
 
-    if st.session_state.selected_site:
-        target_row = df[df['현장명'] == st.session_state.selected_site].iloc[0]
-        ws = target_row['warnings'] if target_row['warnings'] else []
+    with col_left:
+        st.markdown("##### 🔍 현장 검색")
+        site_list = df['현장명'].tolist()
+        curr_idx = site_list.index(st.session_state.selected_site) if st.session_state.selected_site in site_list else None
         
-        # [TEST] 강제 주입된 경보가 있으면 표시
-        for w, s_list in warning_summary.items():
-            if st.session_state.selected_site in s_list and w not in ws:
-                if isinstance(ws, list): ws.append(w)
-                else: ws = [w]
+        selected_option = st.selectbox(
+            "현장 선택", site_list, index=curr_idx,
+            placeholder="현장명을 입력하세요", label_visibility="collapsed"
+        )
         
-        current_temp, temp_time = None, None
-        if pd.notna(target_row['lat']):
-            current_temp, temp_time = get_current_temp_optimized(target_row['lat'], target_row['lon'])
-        
-        with st.container(border=True):
-            status_html = f'<span class="status-badge badge-warning">🚨 특보 발령</span>' if ws else f'<span class="status-badge badge-normal">✅ 이상 없음</span>'
-            st.markdown(f"""
-                <div class="site-header">
-                    <span class="site-title">📍 {target_row['현장명']}</span>
-                    {status_html}
-                </div>
-                <div class='site-addr'>{target_row['주소']}</div>
-            """, unsafe_allow_html=True)
+        if selected_option != st.session_state.selected_site:
+            st.session_state.selected_site = selected_option
+            st.rerun()
+
+        if st.session_state.selected_site:
+            target_row = df[df['현장명'] == st.session_state.selected_site].iloc[0]
+            ws = target_row['warnings'] if target_row['warnings'] else []
             
-            if current_temp is not None:
+            current_temp, temp_time = None, None
+            if pd.notna(target_row['lat']):
+                current_temp, temp_time = get_current_temp_optimized(target_row['lat'], target_row['lon'])
+            
+            with st.container(border=True):
+                status_html = f'<span class="status-badge badge-warning">🚨 특보 발령</span>' if ws else f'<span class="status-badge badge-normal">✅ 이상 없음</span>'
                 st.markdown(f"""
-                    <div>
-                        <span class='temp-badge'>🌡️ {current_temp}℃</span>
+                    <div class="site-header">
+                        <span class="site-title">📍 {target_row['현장명']}</span>
+                        {status_html}
                     </div>
-                    <div class='time-caption'>기상청 {temp_time} 기준</div>
+                    <div class='site-addr'>{target_row['주소']}</div>
                 """, unsafe_allow_html=True)
-            else:
-                st.caption("기온 데이터 수신 대기 중...")
-            
-            if ws:
-                st.markdown("---")
-                for w in ws:
-                    color_md = ":red" if "경보" in w else ":orange"
-                    st.markdown(f"{color_md}[**⚠️ {w}**]")
-    else:
-        st.info("위에서 현장을 검색하세요.")
-
-    st.write("") 
-    
-    st.markdown("##### 📋 특보 현황 요약 및 포스터")
-    with st.container(height=300, border=True):
-        try:
-            # [중요] 수정된 create_warning_poster 함수 호출
-            poster_img_bytes = create_warning_poster(df, warning_summary)
-            
-            st.download_button(
-                "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
-                file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
-                mime="image/jpeg", use_container_width=True
-            )
-        except Exception as e:
-            st.error(f"포스터 생성 중 오류 발생: {e}")
-            # st.error(e) # 디버깅용
-            
-        st.divider()
-
-        if warning_summary:
-            for w_name, sites in warning_summary.items():
-                color_md = ":red" if "경보" in w_name else ":orange"
-                st.markdown(f"{color_md}[**{w_name} ({len(sites)})**]")
-                st.caption(", ".join(sites))
+                
+                if current_temp is not None:
+                    st.markdown(f"""
+                        <div>
+                            <span class='temp-badge'>🌡️ {current_temp}℃</span>
+                        </div>
+                        <div class='time-caption'>기상청 {temp_time} 기준</div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.caption("기온 데이터 수신 대기 중...")
+                
+                if ws:
+                    st.markdown("---")
+                    for w in ws:
+                        color_md = ":red" if "경보" in w else ":orange"
+                        st.markdown(f"{color_md}[**⚠️ {w}**]")
         else:
-            st.caption("현재 건설안전 관련 특보 발령 현장이 없습니다.")
+            st.info("지도에서 마커를 클릭하거나 위에서 현장을 검색하세요.")
 
-    # [지도 컬럼 제거]
-    # with col_right:
-    #     ... (지도 관련 코드 삭제) ...
+        st.write("") 
+        
+        st.markdown("##### 📋 특보 현황 요약 및 포스터")
+        with st.container(height=300, border=True):
+            try:
+                poster_img_bytes = create_warning_poster(df, warning_summary)
+                
+                st.download_button(
+                    "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
+                    file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
+                    mime="image/jpeg", use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"포스터 생성 중 오류 발생: {e}")
+                
+            st.divider()
+
+            if warning_summary:
+                for w_name, sites in warning_summary.items():
+                    if "건조" not in w_name:
+                        color_md = ":red" if "경보" in w_name else ":orange"
+                        st.markdown(f"{color_md}[**{w_name} ({len(sites)})**]")
+                        st.caption(", ".join(sites))
+            else:
+                st.caption("현재 건설안전 관련 특보 발령 현장이 없습니다.")
+
+    with col_right:
+        valid_coords = df.dropna(subset=['lat', 'lon'])
+        st.markdown("<div class='map-disclaimer'>⚠️ 본 지도는 OpenStreetMap(무료) 기반으로 실제 위치와 약간의 오차가 있을 수 있습니다.</div>", unsafe_allow_html=True)
+
+        if not valid_coords.empty:
+            if st.session_state.selected_site:
+                sel = df[df['현장명'] == st.session_state.selected_site]
+                if not sel.empty:
+                    c_lat, c_lon, z_start = sel.iloc[0]['lat'], sel.iloc[0]['lon'], 11
+                else:
+                    c_lat, c_lon, z_start = 36.5, 127.5, 7
+            else:
+                c_lat, c_lon, z_start = 36.3, 127.8, 7 
+            
+            m = folium.Map(location=[c_lat, c_lon], zoom_start=z_start, tiles='cartodbpositron') 
+
+            for i, row in valid_coords.iterrows():
+                ws = row['warnings'] if row['warnings'] else []
+                color, icon_name = get_icon_and_color(ws)
+                warn_msg = ", ".join(ws) if ws else "이상 없음"
+                
+                folium.Marker(
+                    [row['lat'], row['lon']],
+                    tooltip=f"{row['현장명']} : {warn_msg}",
+                    icon=folium.Icon(color=color, icon=icon_name, prefix='fa')
+                ).add_to(m)
+            
+            map_data = st_folium(m, width=None, height=500) 
+            
+            if map_data and map_data.get("last_object_clicked_tooltip"):
+                clicked_info = map_data["last_object_clicked_tooltip"]
+                if clicked_info:
+                    clicked_name = clicked_info.split(":")[0].strip()
+                    if clicked_name != st.session_state.selected_site:
+                        st.session_state.selected_site = clicked_name
+                        st.rerun()
