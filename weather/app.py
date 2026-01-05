@@ -73,7 +73,7 @@ if 'weather_data' not in st.session_state:
 if 'selected_site' not in st.session_state:
     st.session_state.selected_site = None
 
-geolocator = Nominatim(user_agent="korea_weather_guard_gs_poster_final", timeout=15)
+geolocator = Nominatim(user_agent="korea_weather_guard_gs_final_v5", timeout=15)
 
 # ==========================================
 # 3. 지도 이미지 생성을 위한 유틸리티 (타일 스티칭)
@@ -86,7 +86,6 @@ def deg2num(lat_deg, lon_deg, zoom):
     return (xtile, ytile)
 
 def generate_static_map_image(df_target, width=1200, height=1200):
-    # 안전장치: 데이터 없으면 빈 이미지 반환
     fallback_img = Image.new('RGB', (width, height), (240, 240, 240))
     if df_target.empty: return fallback_img
 
@@ -95,7 +94,6 @@ def generate_static_map_image(df_target, width=1200, height=1200):
         min_lat, max_lat = df_target['lat'].min(), df_target['lat'].max()
         min_lon, max_lon = df_target['lon'].min(), df_target['lon'].max()
         
-        # 여백 추가
         lat_margin = (max_lat - min_lat) * 0.2 if max_lat != min_lat else 0.5
         lon_margin = (max_lon - min_lon) * 0.2 if max_lon != min_lon else 0.5
         
@@ -104,7 +102,6 @@ def generate_static_map_image(df_target, width=1200, height=1200):
         min_lon -= lon_margin
         max_lon += lon_margin
         
-        # 줌 레벨 결정
         zoom = 6
         if (max_lat - min_lat) < 3 and (max_lon - min_lon) < 3: zoom = 7
         if (max_lat - min_lat) < 1.5 and (max_lon - min_lon) < 1.5: zoom = 8
@@ -123,7 +120,6 @@ def generate_static_map_image(df_target, width=1200, height=1200):
         user_agent = "Mozilla/5.0 (WeatherPoster/1.0)"
         headers = {"User-Agent": user_agent}
         
-        # 타일 다운로드
         for x in range(x_min, x_max + 1):
             for y in range(y_min, y_max + 1):
                 url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
@@ -144,7 +140,7 @@ def generate_static_map_image(df_target, width=1200, height=1200):
 
         draw = ImageDraw.Draw(map_img)
         
-        # [지도 마커] 한파/폭염만 표시
+        # [지도 마커] 요청사항 8-1: 한파/폭염만 표시 (색상 구분)
         for idx, row in df_target.iterrows():
             px, py = get_pixel_coords(row['lat'], row['lon'])
             warnings = row['warnings']
@@ -154,9 +150,12 @@ def generate_static_map_image(df_target, width=1200, height=1200):
             if warnings:
                 if any("폭염" in w for w in warnings): color = "red"
                 elif any("한파" in w for w in warnings): color = "blue"
-                else: continue 
+                # 기타 안전 특보(호우, 태풍 등)도 표시하고 싶다면 아래 주석 해제
+                # elif any("호우" in w or "태풍" in w for w in warnings): color = "purple"
+                # elif any("대설" in w for w in warnings): color = "cyan"
+                # elif any("강풍" in w for w in warnings): color = "green"
+                else: continue # 한파/폭염 아니면 지도에 표시 안함
                 
-                # 외곽선 있는 원 그리기
                 draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=color, outline="white", width=4)
 
         return map_img.resize((width, height), Image.LANCZOS)
@@ -178,7 +177,6 @@ def get_base64_of_bin_file(bin_file):
 
 @st.cache_resource
 def load_custom_font(size=20):
-    # 폰트 로드 (Pretendard 우선 -> 나눔고딕 -> 기본)
     try:
         font_files = ["Pretendard-Bold.ttf", "Pretendard-Medium.ttf", "Pretendard-Regular.ttf"]
         for f in font_files:
@@ -196,14 +194,13 @@ def load_custom_font(size=20):
     except: pass
     return ImageFont.load_default()
 
-# [핵심] 포스터 생성 함수 (A4, 2분할, 조건부 안전수칙)
+# [포스터 생성 함수]
 def create_warning_poster(full_df, warning_summary):
     # A4 Size (300dpi: 2480 x 3508 pixels)
     W, H = 2480, 3508
     img = Image.new('RGB', (W, H), color='white')
     draw = ImageDraw.Draw(img)
     
-    # 폰트 설정
     font_title = load_custom_font(140)
     font_subtitle = load_custom_font(60)
     font_section = load_custom_font(80)
@@ -224,11 +221,12 @@ def create_warning_poster(full_df, warning_summary):
     text_w = bbox[2] - bbox[0]
     draw.text(((W - text_w) / 2, 280), current_time, font=font_subtitle, fill="#dddddd")
 
-    # 2. 데이터 분류 (한파/폭염만 추출)
+    # 2. 데이터 분류
     sites_heat_warning = []  # 폭염 경보
     sites_heat_advisory = [] # 폭염 주의보
     sites_cold_15 = []       # 영하 15도 (한파 경보)
     sites_cold_12 = []       # 영하 12도 (한파 주의보)
+    sites_others = []        # 기타 안전 특보 (호우, 태풍 등)
     
     filtered_sites_for_map = [] 
     
@@ -236,14 +234,17 @@ def create_warning_poster(full_df, warning_summary):
     has_cold = False
 
     for w_name, sites in warning_summary.items():
-        # [지도용 데이터] 한파/폭염만 추가
+        # [Double Check] 건조는 절대 포함 금지
+        if "건조" in w_name: continue
+
+        # 지도용 데이터 (한파/폭염만)
         if "한파" in w_name or "폭염" in w_name:
             for s in sites:
                 site_row = full_df[full_df['현장명'] == s]
                 if not site_row.empty:
                     filtered_sites_for_map.append(site_row.iloc[0])
 
-        # [리스트용 데이터]
+        # 리스트용 데이터 분류
         if "폭염경보" in w_name:
             sites_heat_warning.extend(sites)
             has_heat = True
@@ -256,6 +257,9 @@ def create_warning_poster(full_df, warning_summary):
         elif "한파주의보" in w_name:
             sites_cold_12.extend(sites)
             has_cold = True
+        else:
+            # 호우, 태풍, 대설, 강풍 등 (안전 관련)
+            sites_others.append((w_name, sites))
             
     sites_heat_warning = sorted(list(set(sites_heat_warning)))
     sites_heat_advisory = sorted(list(set(sites_heat_advisory)))
@@ -268,12 +272,12 @@ def create_warning_poster(full_df, warning_summary):
     body_y = header_height + 50
     half_w = W // 2
     
-    # [Left] 지도 이미지
+    # [Left] 지도
     map_img = generate_static_map_image(map_df, width=half_w - 100, height=1200)
     img.paste(map_img, (50, body_y))
     draw.rectangle([(50, body_y), (half_w - 50, body_y + 1200)], outline="#cccccc", width=3)
     
-    # [Right] 특보 리스트
+    # [Right] 리스트
     list_x = half_w + 50
     list_y = body_y
     
@@ -300,10 +304,9 @@ def create_warning_poster(full_df, warning_summary):
         draw.text((list_x, current_y), line, font=font_content, fill="#555555")
         return current_y + 90 
 
-    if not (has_heat or has_cold):
-        draw.text((list_x, list_y), "현재 한파/폭염 특보 발령 현장이 없습니다.", font=font_content, fill="#28a745")
+    if not (has_heat or has_cold or sites_others):
+        draw.text((list_x, list_y), "현재 건설안전 관련 기상 특보가 없습니다.", font=font_content, fill="#28a745")
     else:
-        # 폭염 경보 -> 폭염 주의보 -> 한파 경보(-15) -> 한파 주의보(-12) 순서
         if sites_heat_warning:
             list_y = draw_site_group(f"🔥 폭염 경보 ({len(sites_heat_warning)}개소)", "#ff0000", sites_heat_warning, list_y)
         if sites_heat_advisory:
@@ -312,11 +315,19 @@ def create_warning_poster(full_df, warning_summary):
             list_y = draw_site_group(f"❄️ 영하 15도 이하 ({len(sites_cold_15)}개소)", "#000080", sites_cold_15, list_y)
         if sites_cold_12:
             list_y = draw_site_group(f"📉 영하 12도 이하 ({len(sites_cold_12)}개소)", "#1f77b4", sites_cold_12, list_y)
-            
+        
+        # 기타 특보 출력
+        for w_name, s_list in sites_others:
+            color = "#800080" # 기본 보라색
+            if "태풍" in w_name: color = "#8B0000"
+            elif "호우" in w_name: color = "#4B0082"
+            elif "강풍" in w_name: color = "#006400"
+            list_y = draw_site_group(f"⚠️ {w_name} ({len(s_list)}개소)", color, s_list, list_y)
+
         if list_y > (body_y + 1150):
              draw.text((list_x, body_y + 1150), "... (공간 부족으로 이하 생략)", font=font_content, fill="#999999")
 
-    # 4. 하단 안전보건 정보 (조건부 텍스트 - 요청사항 4, 5 반영)
+    # 4. 하단 안전보건 정보 (조건부 출력)
     info_y = body_y + 1200 + 100
     box_margin = 50
     
@@ -338,7 +349,7 @@ def create_warning_poster(full_df, warning_summary):
   • 열발진: 땀띠, 붉은 뾰루지, 가려움, 따가움
         """
         draw.multiline_text((box_margin + 20, info_y), content.strip(), font=font_content, fill="#333333", spacing=20)
-        info_y += 500 # 간격 확보
+        info_y += 500 
 
     # (2) 한파 정보
     if has_cold:
@@ -482,240 +493,18 @@ def get_weather_status():
         return items[0].get('t6', '')
     except: return None
 
-# [핵심 수정: 여기서부터 '한파'와 '폭염'만 남기고 건조특보는 싹 지웁니다]
+# [🔥 핵심 수정: 여기서 건조 특보는 무시하고 안전 관련 특보만 수집]
 def analyze_all_warnings(full_text, keywords):
     if not full_text: return []
     clean_text = full_text.replace('\r', ' ').replace('\n', ' ')
     detected_warnings = []
     matches = re.finditer(r"o\s*([^:]+)\s*:\s*(.*?)(?=o\s|$)", clean_text)
     
-    # 허용할 특보 키워드 (여기에 없는 건조, 호우 등은 무시됨)
-    ALLOWED_KEYWORDS = ["한파", "폭염"]
+    # 건설 안전에 중요한 키워드
+    ALLOWED_KEYWORDS = ["한파", "폭염", "호우", "대설", "태풍", "강풍"]
     
     for match in matches:
         w_name = match.group(1).strip()
         content = match.group(2)
         
-        # 1. 특보 이름에 '한파' 또는 '폭염'이 들어있는지 확인
-        is_allowed = False
-        for allowed in ALLOWED_KEYWORDS:
-            if allowed in w_name:
-                is_allowed = True
-                break
-        
-        if not is_allowed:
-            continue # 허용되지 않은 특보(건조 등)는 건너뜀
-            
-        # 2. 내 현장(keyword)이 특보 내용(content)에 있는지 확인
-        for key in keywords:
-            if key in content:
-                detected_warnings.append(w_name)
-                break
-                
-    return list(set(detected_warnings))
-
-def get_icon_and_color(warning_list):
-    if not warning_list: return "blue", "info-sign"
-    is_warning = any("경보" in w for w in warning_list)
-    color = "red" if is_warning else "orange"
-    main_w = warning_list[0]
-    icon_map = {"한파": "asterisk", "건조": "fire", "폭염": "sun", "호우": "tint", "대설": "snowflake-o", "태풍": "bullseye", "강풍": "flag"}
-    icon = "exclamation"
-    for k, v in icon_map.items():
-        if k in main_w: icon = v; break
-    return color, icon
-
-def render_custom_metric(label, value, color="#333", icon=""):
-    html = f"""
-    <div class="metric-card">
-        <div class="metric-label">{icon} {label}</div>
-        <div class="metric-value" style="color: {color};">{value}</div>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
-
-# ==========================================
-# [사이드바]
-# ==========================================
-with st.sidebar:
-    st.header("⚙️ 설정")
-    if st.button("🔄 데이터/위치 재분석", use_container_width=True):
-        if os.path.exists(get_file_path(CACHE_FILENAME)):
-            os.remove(get_file_path(CACHE_FILENAME))
-        st.session_state.weather_data = None
-        st.rerun()
-
-# ==========================================
-# 4. 메인 화면 로직
-# ==========================================
-
-logo_path = get_file_path(LOGO_FILENAME)
-img_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else ""
-
-st.markdown(
-    f"""
-    <div class="custom-header-box">
-        <div class="header-title">GS건설 현장 기상정보</div>
-        <img src="data:image/png;base64,{img_base64}" class="header-logo-img">
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-if st.session_state.weather_data is None:
-    st.session_state.weather_data = load_data_once()
-
-df = st.session_state.weather_data
-
-if not df.empty:
-    full_text = get_weather_status()
-    df['warnings'] = None
-    warning_summary = {}
-    warn_sites, normal_sites = [], []
-
-    if full_text:
-        for i, row in df.iterrows():
-            addr = str(row.get('주소', ''))
-            keywords = [t[:-1] for t in addr.replace(',', ' ').split() if t.endswith(('시', '군')) and len(t[:-1]) >= 2]
-            # analyze_all_warnings 에서 이미 한파/폭염 외에는 걸러짐
-            w_list = analyze_all_warnings(full_text, keywords) if keywords else []
-            
-            df.at[i, 'warnings'] = w_list
-            if w_list:
-                warn_sites.append(f"{row['현장명']}")
-                for w in w_list:
-                    if w not in warning_summary: warning_summary[w] = []
-                    warning_summary[w].append(row['현장명'])
-            else:
-                normal_sites.append(row['현장명'])
-
-    m1, m2, m3 = st.columns(3)
-    with m1: render_custom_metric("총 현장", f"{len(df)}", color="#333", icon="🏗️")
-    with m2: render_custom_metric("특보 발령", f"{len(warn_sites)}", color="#FF4B4B", icon="🚨")
-    with m3: render_custom_metric("이상 없음", f"{len(normal_sites)}", color="#00CC96", icon="✅")
-    
-    st.write("") 
-    with st.expander("📢 기상청 특보 전문 보기 (클릭하여 펼치기)", expanded=False):
-        if full_text:
-            text = full_text.replace("o ", "\n o ").strip()
-            st.text(text)
-        else:
-            st.info("현재 수신된 특보 데이터가 없습니다.")
-
-    st.divider()
-
-    col_left, col_right = st.columns([3.5, 6.5])
-
-    with col_left:
-        st.markdown("##### 🔍 현장 검색")
-        site_list = df['현장명'].tolist()
-        curr_idx = site_list.index(st.session_state.selected_site) if st.session_state.selected_site in site_list else None
-        
-        selected_option = st.selectbox(
-            "현장 선택", site_list, index=curr_idx,
-            placeholder="현장명을 입력하세요", label_visibility="collapsed"
-        )
-        
-        if selected_option != st.session_state.selected_site:
-            st.session_state.selected_site = selected_option
-            st.rerun()
-
-        if st.session_state.selected_site:
-            target_row = df[df['현장명'] == st.session_state.selected_site].iloc[0]
-            ws = target_row['warnings'] if target_row['warnings'] else []
-            
-            current_temp, temp_time = None, None
-            if pd.notna(target_row['lat']):
-                current_temp, temp_time = get_current_temp_optimized(target_row['lat'], target_row['lon'])
-            
-            with st.container(border=True):
-                status_html = f'<span class="status-badge badge-warning">🚨 특보 발령</span>' if ws else f'<span class="status-badge badge-normal">✅ 이상 없음</span>'
-                st.markdown(f"""
-                    <div class="site-header">
-                        <span class="site-title">📍 {target_row['현장명']}</span>
-                        {status_html}
-                    </div>
-                    <div class='site-addr'>{target_row['주소']}</div>
-                """, unsafe_allow_html=True)
-                
-                if current_temp is not None:
-                    st.markdown(f"""
-                        <div>
-                            <span class='temp-badge'>🌡️ {current_temp}℃</span>
-                        </div>
-                        <div class='time-caption'>기상청 {temp_time} 기준</div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.caption("기온 데이터 수신 대기 중...")
-                
-                if ws:
-                    st.markdown("---")
-                    for w in ws:
-                        color_md = ":red" if "경보" in w else ":orange"
-                        st.markdown(f"{color_md}[**⚠️ {w}**]")
-        else:
-            st.info("지도에서 마커를 클릭하거나 위에서 현장을 검색하세요.")
-
-        st.write("") 
-        
-        st.markdown("##### 📋 특보 현황 요약 및 포스터")
-        with st.container(height=300, border=True):
-            try:
-                poster_img_bytes = create_warning_poster(df, warning_summary)
-                
-                st.download_button(
-                    "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
-                    file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
-                    mime="image/jpeg", use_container_width=True
-                )
-            except Exception as e:
-                st.error(f"포스터 생성 중 오류 발생: {e}")
-                
-            st.divider()
-
-            if warning_summary:
-                for w_name, sites in warning_summary.items():
-                    # [화면 리스트]에도 한파/폭염만 나오게 필터링
-                    if "한파" in w_name or "폭염" in w_name:
-                        color_md = ":red" if "경보" in w_name else ":orange"
-                        st.markdown(f"{color_md}[**{w_name} ({len(sites)})**]")
-                        st.caption(", ".join(sites))
-            else:
-                st.caption("현재 한파/폭염 특보 발령 현장이 없습니다.")
-
-    with col_right:
-        valid_coords = df.dropna(subset=['lat', 'lon'])
-        st.markdown("<div class='map-disclaimer'>⚠️ 본 지도는 OpenStreetMap(무료) 기반으로 실제 위치와 약간의 오차가 있을 수 있습니다.</div>", unsafe_allow_html=True)
-
-        if not valid_coords.empty:
-            if st.session_state.selected_site:
-                sel = df[df['현장명'] == st.session_state.selected_site]
-                if not sel.empty:
-                    c_lat, c_lon, z_start = sel.iloc[0]['lat'], sel.iloc[0]['lon'], 11
-                else:
-                    c_lat, c_lon, z_start = 36.5, 127.5, 7
-            else:
-                c_lat, c_lon, z_start = 36.3, 127.8, 7 
-            
-            m = folium.Map(location=[c_lat, c_lon], zoom_start=z_start, tiles='cartodbpositron') 
-
-            for i, row in valid_coords.iterrows():
-                ws = row['warnings'] if row['warnings'] else []
-                color, icon_name = get_icon_and_color(ws)
-                warn_msg = ", ".join(ws) if ws else "이상 없음"
-                
-                folium.Marker(
-                    [row['lat'], row['lon']],
-                    tooltip=f"{row['현장명']} : {warn_msg}",
-                    icon=folium.Icon(color=color, icon=icon_name, prefix='fa')
-                ).add_to(m)
-            
-            map_data = st_folium(m, width=None, height=500) 
-            
-            if map_data and map_data.get("last_object_clicked_tooltip"):
-                clicked_info = map_data["last_object_clicked_tooltip"]
-                if clicked_info:
-                    clicked_name = clicked_info.split(":")[0].strip()
-                    if clicked_name != st.session_state.selected_site:
-                        st.session_state.selected_site = clicked_name
-                        st.rerun()
+        # 1. "건조"라는 단어가 있으면 무조건 건너뜀 (절대 금지)
