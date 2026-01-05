@@ -73,7 +73,7 @@ if 'weather_data' not in st.session_state:
 if 'selected_site' not in st.session_state:
     st.session_state.selected_site = None
 
-geolocator = Nominatim(user_agent="korea_weather_guard_gs", timeout=15)
+geolocator = Nominatim(user_agent="korea_weather_guard_gs_v2", timeout=15)
 
 # ==========================================
 # 3. 지도 이미지 생성을 위한 유틸리티 (Static Map)
@@ -86,74 +86,81 @@ def deg2num(lat_deg, lon_deg, zoom):
     return (xtile, ytile)
 
 def generate_static_map_image(df_target, width=1200, height=1200):
+    # [안전장치] 빈 캔버스 반환
+    fallback_img = Image.new('RGB', (width, height), (240, 240, 240))
+    
     if df_target.empty:
-        img = Image.new('RGB', (width, height), (240, 240, 240))
-        return img
+        return fallback_img
 
-    min_lat, max_lat = df_target['lat'].min(), df_target['lat'].max()
-    min_lon, max_lon = df_target['lon'].min(), df_target['lon'].max()
-    
-    lat_margin = (max_lat - min_lat) * 0.1 if max_lat != min_lat else 0.5
-    lon_margin = (max_lon - min_lon) * 0.1 if max_lon != min_lon else 0.5
-    
-    min_lat -= lat_margin
-    max_lat += lat_margin
-    min_lon -= lon_margin
-    max_lon += lon_margin
-    
-    zoom = 7
-    if (max_lat - min_lat) < 3 and (max_lon - min_lon) < 3: zoom = 8
-    if (max_lat - min_lat) < 1.5 and (max_lon - min_lon) < 1.5: zoom = 9
-    
-    x_min, y_max = deg2num(min_lat, min_lon, zoom) 
-    x_max, y_min = deg2num(max_lat, max_lon, zoom)
-    
-    tile_size = 256
-    x_count = x_max - x_min + 1
-    y_count = y_max - y_min + 1
-    
-    full_width = x_count * tile_size
-    full_height = y_count * tile_size
-    map_img = Image.new('RGB', (full_width, full_height), (255, 255, 255))
-    
-    user_agent = "Mozilla/5.0 (WeatherPoster/1.0)"
-    headers = {"User-Agent": user_agent}
-    
-    for x in range(x_min, x_max + 1):
-        for y in range(y_min, y_max + 1):
-            url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
-            try:
-                resp = requests.get(url, headers=headers, timeout=1)
-                if resp.status_code == 200:
-                    tile = Image.open(io.BytesIO(resp.content))
-                    map_img.paste(tile, ((x - x_min) * tile_size, (y - y_min) * tile_size))
-            except:
-                pass
-
-    def get_pixel_coords(lat, lon):
-        n = 2.0 ** zoom
-        x = (lon + 180.0) / 360.0 * n
-        y = (1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n
-        px = (x - x_min) * tile_size
-        py = (y - y_min) * tile_size
-        return px, py
-
-    draw = ImageDraw.Draw(map_img)
-    
-    for idx, row in df_target.iterrows():
-        px, py = get_pixel_coords(row['lat'], row['lon'])
-        warnings = row['warnings']
+    try:
+        min_lat, max_lat = df_target['lat'].min(), df_target['lat'].max()
+        min_lon, max_lon = df_target['lon'].min(), df_target['lon'].max()
         
-        color = "gray"
-        radius = 12
-        if warnings:
-            if any("폭염" in w for w in warnings): color = "red"
-            elif any("한파" in w for w in warnings): color = "blue"
-            else: continue # 한파/폭염 아니면 지도에 표시 안함
-            
-            draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=color, outline="white", width=3)
+        lat_margin = (max_lat - min_lat) * 0.1 if max_lat != min_lat else 0.5
+        lon_margin = (max_lon - min_lon) * 0.1 if max_lon != min_lon else 0.5
+        
+        min_lat -= lat_margin
+        max_lat += lat_margin
+        min_lon -= lon_margin
+        max_lon += lon_margin
+        
+        zoom = 7
+        if (max_lat - min_lat) < 3 and (max_lon - min_lon) < 3: zoom = 8
+        if (max_lat - min_lat) < 1.5 and (max_lon - min_lon) < 1.5: zoom = 9
+        
+        x_min, y_max = deg2num(min_lat, min_lon, zoom) 
+        x_max, y_min = deg2num(max_lat, max_lon, zoom)
+        
+        tile_size = 256
+        x_count = x_max - x_min + 1
+        y_count = y_max - y_min + 1
+        
+        full_width = x_count * tile_size
+        full_height = y_count * tile_size
+        map_img = Image.new('RGB', (full_width, full_height), (255, 255, 255))
+        
+        user_agent = "Mozilla/5.0 (GS_Weather_Poster/1.0)"
+        headers = {"User-Agent": user_agent}
+        
+        # 타일 다운로드 (에러 발생 시 무시하고 진행)
+        for x in range(x_min, x_max + 1):
+            for y in range(y_min, y_max + 1):
+                url = f"https://tile.openstreetmap.org/{zoom}/{x}/{y}.png"
+                try:
+                    resp = requests.get(url, headers=headers, timeout=0.5) # 타임아웃 짧게
+                    if resp.status_code == 200:
+                        tile = Image.open(io.BytesIO(resp.content))
+                        map_img.paste(tile, ((x - x_min) * tile_size, (y - y_min) * tile_size))
+                except:
+                    pass # 타일 하나 실패해도 계속 진행
 
-    return map_img.resize((width, height), Image.LANCZOS)
+        def get_pixel_coords(lat, lon):
+            n = 2.0 ** zoom
+            x = (lon + 180.0) / 360.0 * n
+            y = (1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n
+            px = (x - x_min) * tile_size
+            py = (y - y_min) * tile_size
+            return px, py
+
+        draw = ImageDraw.Draw(map_img)
+        
+        for idx, row in df_target.iterrows():
+            px, py = get_pixel_coords(row['lat'], row['lon'])
+            warnings = row['warnings']
+            
+            color = "gray"
+            radius = 12
+            if warnings:
+                if any("폭염" in w for w in warnings): color = "red"
+                elif any("한파" in w for w in warnings): color = "blue"
+                else: continue 
+                
+                draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=color, outline="white", width=3)
+
+        return map_img.resize((width, height), Image.LANCZOS)
+    except:
+        # 지도 생성 중 무슨 에러가 나도 빈 이미지는 리턴
+        return fallback_img
 
 # ==========================================
 # 4. 함수 정의
@@ -170,24 +177,31 @@ def get_base64_of_bin_file(bin_file):
 
 @st.cache_resource
 def load_custom_font(size=20):
-    font_files = ["Pretendard-Bold.ttf", "Pretendard-Medium.ttf", "Pretendard-Regular.ttf"]
-    for f in font_files:
-        path = get_file_path(f)
-        if os.path.exists(path):
-            return ImageFont.truetype(path, size)
-    
-    font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
-    font_path = "NanumGothic-Bold.ttf"
-    if not os.path.exists(font_path):
-        try:
-            r = requests.get(font_url)
-            with open(font_path, "wb") as f:
-                f.write(r.content)
-        except: pass
+    # [안전장치] 폰트 로드 실패 시 무조건 기본 폰트 사용
     try:
-        return ImageFont.truetype(font_path, size)
+        font_files = ["Pretendard-Bold.ttf", "Pretendard-Medium.ttf", "Pretendard-Regular.ttf"]
+        for f in font_files:
+            path = get_file_path(f)
+            if os.path.exists(path):
+                return ImageFont.truetype(path, size)
+        
+        # 다운로드 시도
+        font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
+        font_path = "NanumGothic-Bold.ttf"
+        if not os.path.exists(font_path):
+            try:
+                r = requests.get(font_url, timeout=3)
+                with open(font_path, "wb") as f:
+                    f.write(r.content)
+            except:
+                pass 
+        
+        if os.path.exists(font_path):
+            return ImageFont.truetype(font_path, size)
     except:
-        return ImageFont.load_default()
+        pass
+    
+    return ImageFont.load_default()
 
 # [핵심] 포스터 생성 함수 (A4, 2분할, 한파/폭염만 표시)
 def create_warning_poster(full_df, warning_summary):
@@ -195,6 +209,7 @@ def create_warning_poster(full_df, warning_summary):
     img = Image.new('RGB', (W, H), color='white')
     draw = ImageDraw.Draw(img)
     
+    # 폰트 로딩 (안전장치 적용됨)
     font_title = load_custom_font(140)
     font_subtitle = load_custom_font(60)
     font_section = load_custom_font(70)
@@ -227,7 +242,7 @@ def create_warning_poster(full_df, warning_summary):
     has_cold = False
 
     for w_name, sites in warning_summary.items():
-        # [중요] '건조'는 여기서 걸러져서 아예 처리가 안됨
+        # '건조'는 여기서 제외됨
         if "한파" in w_name or "폭염" in w_name:
             for s in sites:
                 site_row = full_df[full_df['현장명'] == s]
@@ -252,12 +267,13 @@ def create_warning_poster(full_df, warning_summary):
     sites_cold_15 = sorted(list(set(sites_cold_15)))
     sites_cold_12 = sorted(list(set(sites_cold_12)))
 
-    # 지도 생성
+    # 지도 생성 (에러나면 빈 지도 반환)
     map_df = pd.DataFrame(filtered_sites_for_map) if filtered_sites_for_map else pd.DataFrame(columns=['lat', 'lon', 'warnings', '현장명'])
-
+    
     body_y = header_height + 50
     half_w = W // 2
     
+    # 지도 그리기
     map_img = generate_static_map_image(map_df, width=half_w - 100, height=1200)
     img.paste(map_img, (50, body_y))
     draw.rectangle([(50, body_y), (half_w - 50, body_y + 1200)], outline="#cccccc", width=3)
@@ -613,17 +629,21 @@ if not df.empty:
         
         st.markdown("##### 📋 특보 현황 요약 및 포스터")
         with st.container(height=300, border=True):
-            # [수정됨] create_warning_poster 함수가 하나로 통일됨
-            poster_img_bytes = create_warning_poster(df, warning_summary)
-            
-            st.download_button(
-                "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
-                file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
-                mime="image/jpeg", use_container_width=True
-            )
+            # [수정됨] 에러 처리 및 스피너 추가
+            try:
+                poster_img_bytes = create_warning_poster(df, warning_summary)
+                
+                st.download_button(
+                    "🖼️ 현황 포스터(A4) 다운로드", data=poster_img_bytes,
+                    file_name=f"기상특보_현황_{datetime.datetime.now().strftime('%Y%m%d')}.jpg",
+                    mime="image/jpeg", use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"포스터 생성 중 오류 발생: {e}")
+                
             st.divider()
 
-            # [UI 리스트에서도 건조특보 제외 로직]
+            # [UI 리스트에도 건조특보 제외 로직 추가]
             has_valid_warnings = False
             if warning_summary:
                 for w_name, sites in warning_summary.items():
