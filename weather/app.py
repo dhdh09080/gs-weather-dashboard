@@ -459,12 +459,12 @@ def render_custom_metric(label, value, color="#333", icon=""):
 # [사이드바]
 # ==========================================
 with st.sidebar:
-    st.header("⚙️ 설정 및 제어")
+    st.header("⚙️ 설정")
     
     # 텔레그램 전송 버튼 로직
     # 중요: 데이터 분석이 완료된(st.session_state.processed_data가 있는) 상태여야 전송 가능
     st.markdown("### 📤 알림 전송")
-    if st.button("🚀 텔레그램으로 현황 전송", use_container_width=True):
+    if st.button("🚀 텔레그램 전송", use_container_width=True):
         if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
             st.error("텔레그램 토큰 또는 Chat ID가 설정되지 않았습니다.")
         elif st.session_state.processed_data is None:
@@ -480,10 +480,10 @@ with st.sidebar:
             kst = pytz.timezone('Asia/Seoul')
             now_str = datetime.datetime.now(kst).strftime('%Y년 %m월 %d일 %H:%M 기준')
             
-            msg_lines = [f"🚨 [GS건설 현장 작업통제 알림]\n{now_str}\n"]
+            msg_lines = [f"🚨 [GS건설 현장 기온 모니터링]\n{now_str}\n"]
             
             if not list_stop_all.empty:
-                msg_lines.append(f"\n⛔ 전면작업중지 (-15℃ 이하): {len(list_stop_all)}개소")
+                msg_lines.append(f"\n⛔ 옥외/옥내 작업중지 (-15℃ 이하): {len(list_stop_all)}개소")
                 for _, row in list_stop_all.iterrows():
                     msg_lines.append(f" - {row['현장명']} ({row['temp_val']}℃)")
             
@@ -770,3 +770,4 @@ if not df.empty:
                     if clicked_name != st.session_state.selected_site:
                         st.session_state.selected_site = clicked_name
                         st.rerun()
+
